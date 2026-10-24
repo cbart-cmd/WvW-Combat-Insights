@@ -4,7 +4,7 @@
 highlights and squad healing. English, Spanish, French and German UI. Official
 names and icons are bundled; displaying them does not require the wiki or API.
 
-- **[Download v0.2.17](https://github.com/cbart-cmd/gw2addonsreleases/releases/tag/fight-analysis-danger-v0.2.17)**
+- **[Download v0.2.18](https://github.com/cbart-cmd/gw2addonsreleases/releases/tag/fight-analysis-danger-v0.2.18)**
   (choose `fight_analysis_danger.dll`, not the Timers DLL).
 - [Report a bug](https://github.com/cbart-cmd/WvW-Combat-Insights/issues) |
   [Contributing](CONTRIBUTING.md) | [Security](SECURITY.md) | [Changelog](CHANGELOG.md).
@@ -156,17 +156,22 @@ muestran el combate en curso, actualizado aproximadamente cada segundo y marcado
 Requiere arcdps y **ArcDPS Integration** de Nexus, que publica los eventos locales/de escuadron y las altas/bajas
 ([bridge](https://github.com/RaidcoreGG/GW2-Arcdps-Integration)).
 No consulta estadisticas acumuladas ni reconstruye eventos anteriores a la carga del addon.
-Desde v0.2.15, entrar en combate contra NPCs no inicia ni sustituye el directo y no activa
-**Ocultar en combate**. Se exige dano observado entre tu personaje (o mascota con propietario
-identificado) y un jugador enemigo identificado. Una vez detectado PvP, cuenta como combate
+Entrar en combate contra NPCs no inicia ni sustituye el directo y no activa
+**Ocultar en combate**. Desde v0.2.18 basta con observar dano PvP de tu personaje, su mascota
+identificada o un jugador de tu equipo/escuadron mientras tu estas en combate, aunque solo cures.
+Una pelea ajena mientras tu estas fuera de combate no lo activa. Una vez detectado PvP, cuenta como combate
 hasta salir del combate de GW2, aunque despues solo pegues a NPCs. Sin eventos del bridge
 no se puede detectar PvP: no se ocultan ventanas por el estado generico de combate.
 El flujo de escuadron alimenta las metricas; el local solo detecta el combate y aporta metadatos,
 sin sumar dos veces sus eventos compartidos. Se reutilizan los calculos del parser EVTC.
+El directo abre las ventanas con autoapertura en el primer refresco (aproximadamente un segundo),
+sin esperar los 20 segundos de duracion minima, que solo se aplican a los logs.
 
 Durante el directo de **Follow latest fight**, Resumen y Destacados muestran **solo nuestro equipo**,
 sin pestanas ni filas de otros colores, tampoco en ventanas adicionales ni en el menu de color.
-Fuera de combate los logs conservan su comportamiento habitual de tres colores.
+Los logs reales conservan los tres colores y seleccionan inicialmente el propio al cambiar de combate.
+La antigua preferencia inicial de primer enemigo migra una vez a equipo propio; se puede volver a elegir
+manualmente en opciones. Una seleccion manual de color se conserva durante los refrescos del mismo informe.
 Desde v0.2.16 el dano/DPS, corrups y contribucion no dependen de recibir la correspondencia de colores:
 usan los IDs de equipo observados o la afinidad hostil de arcdps contra jugadores identificados.
 Si el color propio aun no se conoce, aparece **Nuestro equipo** en tono neutro, sin inventar un color.
@@ -176,9 +181,11 @@ eventos y metadatos compatibles de Healing Stats; tener la extension instalada n
 Las metricas ausentes siguen como `-`. El limite de seguridad es de 1.000.000 eventos por combate:
 si se alcanza, aparece un aviso de directo incompleto y se espera al log, sin descartar silenciosamente el inicio.
 
-Al salir de combate, **Seguir el ultimo combate** vuelve inmediatamente al **ultimo log analizado**;
-cuando llega el nuevo log, pasa a mostrarlo. Si aun no hay logs, se muestra la espera, no el directo congelado.
-El siguiente combate empieza desde cero. Los informes provisionales **no entran en el historial**.
+Al salir de combate se conserva el informe como **Combate finalizado · provisional** en el
+**historial de esta sesion**, con el mismo limite de combates que los logs y seleccionable como ellos.
+**Seguir el ultimo combate** lo mantiene visible, sin volver al log anterior. Si llega un log que
+cubre sus eventos, lo sustituye sin duplicarlo; tambien actualiza una seleccion fijada en ese provisional.
+El siguiente combate empieza desde cero. Estos informes no se guardan en disco y se pierden al cerrar GW2.
 Un log antiguo no borra un combate nuevo en curso. Elegir un log desactiva el directo
 y conserva ese combate, sin mezclarlo con datos actuales. Sin eventos del bridge, sigue funcionando el seguimiento de logs.
 
@@ -223,7 +230,7 @@ las posiciones se ajustan al area visible tras cambiar de resolucion.
 | Columnas Destacados | Dano + corrups + Down contribution |
 | Columnas Healing | Curas + barrera + limpias |
 | Historial | 10 combates (1–20) |
-| Duracion minima para apertura automatica | 20 s |
+| Duracion minima para apertura automatica de logs (no del directo) | 20 s |
 | Dano y strips solo sobre jugadores | Si |
 | Carpeta de logs | La de arcdps |
 

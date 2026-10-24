@@ -126,25 +126,30 @@ infracontados. Los logs reales validan la lectura, no equivalencia numerica con 
 segun el estado de gameplay de Nexus. Reaparecen al volver a WvW sin cambiar preferencias ni informes.</p>
 <h3>Datos provisionales en directo (v0.2.13)</h3>
 <p>Desde v0.2.15, pegar solo a NPCs no inicia ni sustituye el directo ni activa <strong>Ocultar en combate</strong>.
-Se exige dano observado entre tu personaje (o mascota de propietario identificado) y un jugador enemigo identificado.
+Desde v0.2.18 basta con dano PvP de tu personaje, su mascota identificada o un jugador de tu equipo/escuadron
+mientras tu estas en combate, aunque solo cures. Las peleas ajenas mientras estas fuera de combate no lo activan.
 Tras detectar PvP, el combate se mantiene hasta salir del combate de GW2, aunque despues pegues solo a NPCs.
 Sin eventos del bridge no se puede detectar PvP y el combate generico no oculta ventanas.</p>
 <p><strong>Seguir el ultimo combate / Follow latest fight</strong> muestra el combate en curso en las tres ventanas y las adicionales,
 con actualizacion aproximada cada segundo y la marca <strong>En directo · provisional</strong>.
+La autoapertura del directo ocurre en el primer refresco, sin esperar los 20 segundos minimos de los logs.
 Requiere arcdps y <a href="https://github.com/RaidcoreGG/GW2-Arcdps-Integration">ArcDPS Integration</a> de Nexus.
 No consulta cifras acumuladas ni recupera eventos anteriores a la carga del addon.
 Las metricas usan solo el flujo de escuadron y reutilizan los calculos EVTC; el flujo local detecta el combate y aporta metadatos, sin duplicar importes.</p>
 <p>Durante el directo de <strong>Follow latest fight</strong>, Resumen y Destacados muestran <strong>solo nuestro equipo</strong>,
-sin filas/pestanas de otros colores, tambien en ventanas adicionales y menu de color. Los logs fuera de combate conservan los tres colores.
+sin filas/pestanas de otros colores, tambien en ventanas adicionales y menu de color. Los logs reales conservan los tres colores
+y seleccionan el propio al cambiar de combate. El antiguo valor inicial de primer enemigo migra una vez a equipo propio;
+se puede elegir otro en opciones. El color elegido manualmente se conserva al refrescar el mismo informe.
 Desde v0.2.16 el dano/DPS, corrups y contribucion usan IDs de equipo o afinidad hostil de arcdps contra jugadores identificados:
 no requieren correspondencias de colores. Sin color propio verificado se muestra <strong>Nuestro equipo</strong> en tono neutro.
 Los datos de equipo de cada identidad se actualizan con los nuevos eventos.
 Curas/barreras necesitan eventos y metadatos de Healing Stats compatibles entregados por el bridge:
 instalar la extension no garantiza esa cobertura. Los datos ausentes siguen como <code>-</code>.
 Al alcanzar el limite de seguridad de 1.000.000 eventos aparece un aviso de directo incompleto; no se descarta silenciosamente el inicio.</p>
-<p>Al salir de combate, <strong>Seguir el ultimo combate</strong> muestra inmediatamente el <strong>ultimo log analizado</strong>;
-cuando llega el nuevo log, muestra ese. Sin logs, muestra la espera, no el directo congelado.
-No entra en el historial; un nuevo combate empieza desde cero y un log antiguo no borra uno nuevo en curso.
+<p>Al salir de combate, <strong>Seguir el ultimo combate</strong> conserva el informe como
+<strong>Combate finalizado · provisional</strong> en el historial de esta sesion, seleccionable como un log
+y sujeto al mismo limite de combates. Si llega su log real, lo sustituye sin duplicarlo, incluso si estaba seleccionado manualmente.
+No se guarda en disco y se pierde al cerrar GW2. Un nuevo combate empieza desde cero y un log antiguo no borra uno nuevo en curso.
 Elegir un log desactiva el directo en todas las ventanas y conserva el informe elegido.
 Sin eventos del bridge sigue funcionando el seguimiento de logs.
 El ajuste antiguo <code>healing_rows</code> se ignora y deja de guardarse: ni ranking ni copia tienen ya ese recorte.</p>
@@ -184,7 +189,7 @@ preferencias e historial; las opciones de Nexus siguen disponibles.</li>
 <tr><td>Destacados</td><td>Con dano o corrups; dano + corrups × 2000 + Down contribution</td></tr>
 <tr><td>Down contribution</td><td>Metodologia nativa AxiLog; sin intervalo configurable</td></tr>
 <tr><td>Historial</td><td>10 combates (1–20)</td></tr>
-<tr><td>Duracion minima de apertura</td><td>20 s</td></tr>
+<tr><td>Duracion minima de apertura de logs (no del directo)</td><td>20 s</td></tr>
 <tr><td>Dano y strips solo contra jugadores</td><td>Si</td></tr>
 <tr><td>Carpeta de logs</td><td>La de arcdps</td></tr>
 </table>

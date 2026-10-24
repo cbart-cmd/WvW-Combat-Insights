@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.18
+
+- Start live reports on observed allied PvP while the local player is in combat,
+  including players who only heal. NPC-only fights and fights observed out of combat
+  do not start a live report.
+- Open live windows at the first refresh, without the saved-log duration threshold.
+- Keep completed provisional fights as selectable session-history entries, including
+  short fights and map transitions between refreshes. Matching EVTC logs replace them.
+  Provisional entries are not saved to disk.
+- Select the player's team when switching reports; preserve manual color changes
+  while refreshing the same report. Migrate the previous enemy-first default once.
+- Preserve existing updater URLs, addon identity, log calculations and healing coverage.
+
 ## 0.2.17
 
 Initial public source snapshot, without the previous private Git history.

@@ -31,6 +31,18 @@ pub struct Report {
 #[derive(Clone)]
 pub struct LiveStatus {
     pub limited: bool,
+    pub finished: bool,
+}
+
+impl Report {
+    pub(crate) fn replaces(&self, provisional: &Report) -> bool {
+        self.live.is_none()
+            && provisional.live.as_ref().is_some_and(|live| live.finished)
+            && matches!(
+                (self.fight.event_range, provisional.fight.event_range),
+                (Some((first, last)), Some((start, end))) if first <= start && last >= end
+            )
+    }
 }
 
 pub struct State {
@@ -42,6 +54,101 @@ pub struct State {
     pub status: Message,
     /// Carpeta de logs en uso.
     pub log_dir: Option<PathBuf>,
+}
+
+impl State {
+    pub(crate) fn store_report(&mut self, report: Arc<Report>, select: bool) {
+        if self
+            .history
+            .iter()
+            .any(|existing| existing.replaces(&report))
+        {
+            return;
+        }
+        self.history.retain(|old| !report.replaces(old));
+        if let Some(index) = self.history.iter().position(|old| old.path == report.path) {
+            if select && index != 0 {
+                self.history.remove(index);
+                self.history.insert(0, report);
+                self.history_index = 0;
+            } else {
+                self.history[index] = report;
+                if select {
+                    self.history_index = 0;
+                }
+            }
+        } else {
+            self.history.insert(0, report);
+            if select {
+                self.history_index = 0;
+            } else {
+                self.history_index += 1;
+            }
+        }
+        self.history.truncate(self.settings.history_size);
+        self.history_index = self.history_index.min(self.history.len().saturating_sub(1));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn report(path: &str, range: (u64, u64), live: bool) -> Arc<Report> {
+        Arc::new(Report {
+            path: path.into(),
+            file_name: path.into(),
+            fight: Fight {
+                event_range: Some(range),
+                ..Default::default()
+            },
+            parse_time: Duration::ZERO,
+            live: live.then_some(LiveStatus {
+                limited: false,
+                finished: true,
+            }),
+        })
+    }
+
+    #[test]
+    fn session_history_keeps_fights_and_only_matching_logs_replace_them() {
+        let mut state = State {
+            settings: Settings {
+                history_size: 2,
+                ..Default::default()
+            },
+            history: Vec::new(),
+            live: None,
+            history_index: 0,
+            status: Message::default(),
+            log_dir: None,
+        };
+        let first = report("live-1", (1000, 2000), true);
+        let second = report("live-2", (3000, 4000), true);
+        state.store_report(Arc::clone(&first), true);
+        state.store_report(Arc::clone(&second), true);
+        assert_eq!(state.history.len(), 2);
+        assert!(Arc::ptr_eq(&state.history[0], &second));
+        let real = report("real.zevtc", (900, 2100), false);
+        assert!(real.replaces(&first));
+        assert!(!real.replaces(&second));
+        let mut active = (*first).clone();
+        active.live.as_mut().unwrap().finished = false;
+        assert!(!real.replaces(&active));
+        state.store_report(Arc::clone(&real), true);
+        assert_eq!(state.history.len(), 2);
+        assert!(Arc::ptr_eq(&state.history[0], &real));
+        assert!(Arc::ptr_eq(&state.history[1], &second));
+        state.store_report(first, true);
+        assert!(
+            Arc::ptr_eq(&state.history[0], &real),
+            "A late final snapshot must not duplicate its log"
+        );
+        state.store_report(report("live-3", (5000, 6000), true), true);
+        assert_eq!(state.history.len(), 2);
+        assert_eq!(state.history[0].path, PathBuf::from("live-3"));
+        assert_eq!(state.history[1].path, real.path);
+    }
 }
 
 static STATE: LazyLock<Mutex<State>> = LazyLock::new(|| {
@@ -184,7 +291,11 @@ pub fn start(arcdps_ini: Option<PathBuf>) {
                     crate::live::invalidate();
                     let paths: Vec<_> = {
                         let st = state();
-                        st.history.iter().map(|r| r.path.clone()).collect()
+                        st.history
+                            .iter()
+                            .filter(|r| r.live.is_none())
+                            .map(|r| r.path.clone())
+                            .collect()
                     };
                     for path in paths {
                         let _ = analyze(path, false, false);
@@ -247,9 +358,6 @@ fn analyze(path: PathBuf, auto: bool, select: bool) -> Result<(), String> {
     };
     let start = Instant::now();
     let result = read_fight(&path, vs_players_only);
-    if let Ok(fight) = &result {
-        crate::live::log_finished(fight);
-    }
     if let Ok(fight) = &result
         && let Some(language) = fight.language
         && let Some(dir) = state().log_dir.clone()
@@ -279,28 +387,7 @@ fn analyze(path: PathBuf, auto: bool, select: bool) -> Result<(), String> {
                 parse_time: start.elapsed(),
                 live: None,
             });
-            if let Some(index) = st.history.iter().position(|old| old.path == report.path) {
-                if select && index != 0 {
-                    st.history.remove(index);
-                    st.history.insert(0, report);
-                    st.history_index = 0;
-                } else {
-                    st.history[index] = report;
-                    if select {
-                        st.history_index = 0;
-                    }
-                }
-            } else {
-                st.history.insert(0, report);
-                if select {
-                    st.history_index = 0;
-                } else {
-                    st.history_index += 1;
-                }
-            }
-            let history_size = st.settings.history_size;
-            st.history.truncate(history_size);
-            st.history_index = st.history_index.min(st.history.len().saturating_sub(1));
+            st.store_report(report, select);
             Ok(())
         }
         Err(err) => {

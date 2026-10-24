@@ -16,7 +16,10 @@ equivalentes al EVTC definitivo. Desde v0.2.16 solo muestra nuestro equipo y cal
 hostilidad mediante IDs de equipo recibidos o afinidad hostil contra jugadores identificados,
 sin depender del color; sin color propio verificado usa "Nuestro equipo" neutro.
 La ruta de logs conserva colores y formulas anteriores. Sin eventos Healing Stats compatibles
-no se inventan esos datos. Los informes provisionales no forman parte del historial.
+no se inventan esos datos. Desde v0.2.18 los informes provisionales finalizados forman parte
+del historial en memoria de la sesion y su log real los sustituye si cubre el intervalo observado.
+El directo arranca con PvP del equipo propio mientras el POV esta en combate, aunque solo cure,
+y se refresca aproximadamente cada segundo sin el umbral de autoapertura de los logs.
 Healing ya no recorta el ranking/copia a 4–10 filas; esto no altera sus formulas ni cobertura.
 
 Referencias fijadas para que la comparacion sea reproducible:

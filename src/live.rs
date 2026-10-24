@@ -1,4 +1,4 @@
-//! Provisional squad-event snapshots; never inserted into the log history.
+//! Provisional squad-event snapshots and session-only combat history.
 
 use crate::nexusbase::arc::{self, AgentUpdate, CombatData, evtc::Event};
 use crate::{
@@ -23,6 +23,15 @@ struct Agent {
     team: u16,
 }
 
+struct Snapshot {
+    agents: Vec<(u64, Player, u16)>,
+    events: Vec<Event>,
+    pov: u64,
+    generation: u64,
+    finished: bool,
+    limited: bool,
+}
+
 #[derive(Default)]
 struct Live {
     roster: HashMap<u64, Agent>,
@@ -38,6 +47,7 @@ struct Live {
     shown: bool,
     events: Vec<Event>,
     metadata: Vec<Event>,
+    completed: Vec<Snapshot>,
 }
 
 static LIVE: LazyLock<Mutex<Live>> = LazyLock::new(|| Mutex::new(Live::default()));
@@ -93,7 +103,7 @@ impl Live {
         }
         let recording = self.active;
         if self_event && event.is_statechange == 2 {
-            self.active = false;
+            self.end();
             self.game_combat = false;
         }
         if !local && recording {
@@ -113,8 +123,20 @@ impl Live {
         if !damage {
             return false;
         }
-        let own =
-            |id, master| id == self.pov || (self.pov_instance != 0 && master == self.pov_instance);
+        let own = |id, master| {
+            id == self.pov
+                || (self.pov_instance != 0 && master == self.pov_instance)
+                || self.roster.get(&id).is_some_and(|agent| {
+                    self.roster.get(&self.pov).is_some_and(|pov| {
+                        (pov.team != 0 && agent.team == pov.team)
+                            || ((pov.team == 0 || agent.team == 0)
+                                && !pov.player.account.is_empty()
+                                && pov.player.subgroup.is_some_and(|g| (1..=15).contains(&g))
+                                && !agent.player.account.is_empty()
+                                && agent.player.subgroup.is_some_and(|g| (1..=15).contains(&g)))
+                    })
+                })
+        };
         let enemy = if own(event.src_agent, event.src_master_instance_id) {
             event.dst_agent
         } else if own(event.dst_agent, event.dst_master_instance_id) {
@@ -134,6 +156,7 @@ impl Live {
     }
 
     fn begin(&mut self) {
+        self.archive();
         self.generation += 1;
         self.participants = self.roster.clone();
         self.events = self.metadata.clone();
@@ -142,6 +165,60 @@ impl Live {
         self.dirty = true;
         self.overflow = false;
         self.shown = false;
+    }
+
+    fn snapshot(&mut self) -> Snapshot {
+        let mut agents: Vec<_> = self
+            .participants
+            .iter()
+            .map(|(id, a)| (*id, a.player.clone(), a.team))
+            .collect();
+        agents.sort_by_key(|(id, _, _)| *id);
+        let finished = !self.active;
+        self.dirty = false;
+        if finished {
+            self.started = None;
+        }
+        Snapshot {
+            agents,
+            events: if finished {
+                std::mem::take(&mut self.events)
+            } else {
+                self.events.clone()
+            },
+            pov: self.pov,
+            generation: self.generation,
+            finished,
+            limited: self.overflow,
+        }
+    }
+
+    fn archive(&mut self) {
+        if !self.active && self.started.is_some() {
+            let snapshot = self.snapshot();
+            self.completed.push(snapshot);
+            if self.completed.len() > crate::settings::MAX_HISTORY_SIZE {
+                self.completed.remove(0);
+            }
+        }
+    }
+
+    fn end(&mut self) {
+        if self.active {
+            self.active = false;
+            self.game_combat = false;
+            self.dirty = true;
+        }
+    }
+
+    fn clear_roster(&mut self) {
+        self.end();
+        self.archive();
+        *self = Self {
+            generation: self.generation + 1,
+            completed: std::mem::take(&mut self.completed),
+            ..Default::default()
+        };
     }
 
     fn push(&mut self, event: Event) {
@@ -185,54 +262,18 @@ impl Live {
             });
         }
     }
-
-    fn finish(&mut self, fight: &evtc::Fight) {
-        let observed = self
-            .events
-            .iter()
-            .filter(|e| e.is_statechange == 0)
-            .map(|e| e.time)
-            .fold(None, |range, time| {
-                Some(range.map_or((time, time), |(first, last): (u64, u64)| {
-                    (first.min(time), last.max(time))
-                }))
-            });
-        let matches = match (observed, fight.event_range) {
-            (Some((first, last)), Some((log_first, log_last))) => {
-                log_first <= first && log_last >= last
-            }
-            (None, Some(_)) => self.started.is_some_and(|start| {
-                start
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .is_ok_and(|time| fight.end_unix >= time.as_secs())
-            }),
-            _ => false,
-        };
-        if !self.active && self.started.is_some() && matches {
-            self.started = None;
-            self.events.clear();
-            self.participants.clear();
-            self.dirty = true;
-        }
-    }
 }
 
 fn update(payload: &AgentUpdate, leave: bool) {
     let mut live = LIVE.lock().unwrap_or_else(|e| e.into_inner());
     if payload.is_self() {
         if leave {
-            *live = Live {
-                generation: live.generation + 1,
-                ..Default::default()
-            };
+            live.clear_roster();
             PLAYER_COMBAT.store(false, Ordering::Relaxed);
             return;
         }
         if live.pov != 0 && live.pov != payload.id as u64 {
-            *live = Live {
-                generation: live.generation + 1,
-                ..Default::default()
-            };
+            live.clear_roster();
             PLAYER_COMBAT.store(false, Ordering::Relaxed);
         }
         live.pov = payload.id as u64;
@@ -325,7 +366,7 @@ fn combat(payload: &CombatData, local: bool) {
         }
     }
     // Use only the squad stream for metrics, not its overlapping local copy.
-    live.ingest(event, local, local && crate::ui::in_combat());
+    live.ingest(event, local, crate::ui::in_combat());
     PLAYER_COMBAT.store(live.active, Ordering::Relaxed);
     if event.is_statechange == 7 {
         live.roster.remove(&event.src_agent);
@@ -394,67 +435,60 @@ pub fn in_player_combat() -> bool {
     PLAYER_COMBAT.load(Ordering::Relaxed) && crate::ui::in_combat()
 }
 
-pub fn log_finished(fight: &evtc::Fight) {
-    let mut live = LIVE.lock().unwrap_or_else(|e| e.into_inner());
-    live.finish(fight);
-}
-
 pub fn refresh(vs_players_only: bool) {
-    if !crate::app::state()
-        .settings
-        .windows
-        .iter()
-        .any(|w| w.enabled && w.follow_latest)
-    {
-        return;
-    }
-    let snapshot = {
+    let snapshots = {
         let mut live = LIVE.lock().unwrap_or_else(|e| e.into_inner());
-        if !live.active {
+        if !crate::ui::in_combat() {
+            live.end();
+            PLAYER_COMBAT.store(false, Ordering::Relaxed);
+        }
+        let mut snapshots = std::mem::take(&mut live.completed);
+        if live.dirty && live.started.is_some() {
+            snapshots.push(live.snapshot());
+        }
+        if live.started.is_none() && snapshots.is_empty() {
             crate::app::state().live = None;
-            return;
         }
-        if !live.dirty {
-            if live.started.is_none() {
-                crate::app::state().live = None;
-            }
-            return;
-        }
-        live.dirty = false;
-        if live.started.is_none() {
-            crate::app::state().live = None;
-            return;
-        }
-        let mut agents: Vec<_> = live
-            .participants
-            .iter()
-            .map(|(id, a)| (*id, a.player.clone(), a.team))
-            .collect();
-        agents.sort_by_key(|(id, _, _)| *id);
-        (agents, live.events.clone(), live.pov, live.generation)
+        snapshots
     };
-    let start = Instant::now();
-    let fight = evtc::live_fight(&snapshot.0, &snapshot.1, snapshot.2, vs_players_only);
-    let mut live = LIVE.lock().unwrap_or_else(|e| e.into_inner());
-    if live.generation == snapshot.3 && live.active {
-        let mut state = crate::app::state();
-        if !live.shown && fight.duration_secs() >= f64::from(state.settings.min_duration_secs) {
-            live.shown = true;
-            for window in &mut state.settings.windows {
-                if window.enabled && window.auto_show && window.follow_latest {
-                    window.visible = true;
+    for snapshot in snapshots {
+        let start = Instant::now();
+        let fight = evtc::live_fight(
+            &snapshot.agents,
+            &snapshot.events,
+            snapshot.pov,
+            vs_players_only,
+        );
+        let mut live = LIVE.lock().unwrap_or_else(|e| e.into_inner());
+        if snapshot.finished || (live.generation == snapshot.generation && live.active) {
+            let mut state = crate::app::state();
+            if !snapshot.finished && !live.shown {
+                live.shown = true;
+                for window in &mut state.settings.windows {
+                    if window.enabled && window.auto_show && window.follow_latest {
+                        window.visible = true;
+                    }
                 }
             }
+            let report = Arc::new(Report {
+                path: format!("live-{}", snapshot.generation).into(),
+                file_name: String::new(),
+                fight,
+                parse_time: start.elapsed(),
+                live: Some(LiveStatus {
+                    limited: snapshot.limited,
+                    finished: snapshot.finished,
+                }),
+            });
+            if snapshot.finished {
+                state.store_report(report, true);
+                if !live.active && live.started.is_none() {
+                    state.live = None;
+                }
+            } else {
+                state.live = Some(report);
+            }
         }
-        state.live = Some(Arc::new(Report {
-            path: Default::default(),
-            file_name: String::new(),
-            fight,
-            parse_time: start.elapsed(),
-            live: Some(LiveStatus {
-                limited: live.overflow,
-            }),
-        }));
     }
 }
 
@@ -699,7 +733,7 @@ mod tests {
     }
 
     #[test]
-    fn only_a_finished_recent_log_retires_the_pending_snapshot() {
+    fn short_fights_and_map_changes_archive_before_the_next_refresh() {
         let mut live = setup();
         live.push(Event {
             time: 1000,
@@ -709,30 +743,22 @@ mod tests {
             time: 2000,
             ..empty_event()
         });
-        let current = evtc::Fight {
-            event_range: Some((500, 2500)),
-            ..Default::default()
-        };
-        let old = evtc::Fight {
-            event_range: Some((0, 999)),
-            ..Default::default()
-        };
-        live.finish(&current);
-        assert!(
-            live.started.is_some(),
-            "an older fight cannot retire an active one"
-        );
-        live.active = false;
-        live.finish(&old);
-        assert!(
-            live.started.is_some(),
-            "an old log must not clear this fight"
-        );
-        live.finish(&current);
+        let first = live.generation;
+        live.end();
+        assert!(live.dirty, "Mumble exit alone must finalize the combat");
+        live.begin();
+        assert_eq!(live.completed.len(), 1);
+        assert_eq!(live.completed[0].generation, first);
+        assert!(live.completed[0].finished);
+        assert_eq!(live.completed[0].events.len(), 3);
+        assert_eq!(live.generation, first + 1);
+        live.clear_roster();
+        assert_eq!(live.completed.len(), 2);
         assert!(live.started.is_none());
         assert!(live.events.is_empty());
-        assert!(live.dirty);
-        assert_eq!(live.roster.len(), 3);
+        assert!(live.roster.is_empty());
+        assert_eq!(live.completed[0].agents.len(), 3);
+        assert!(!live.active);
     }
 
     #[test]
@@ -764,7 +790,7 @@ mod tests {
             true,
             true,
         );
-        for (src, dst) in [(1, 99), (99, 1), (1, 3), (3, 2)] {
+        for (src, dst) in [(1, 99), (99, 1), (1, 3)] {
             live.ingest(
                 &Event {
                     src_agent: src,
@@ -810,6 +836,49 @@ mod tests {
             false,
         );
         assert!(!live.active);
+    }
+
+    #[test]
+    fn allied_pvp_starts_live_for_a_healer_but_not_outside_own_combat() {
+        let hit = Event {
+            time: 1000,
+            src_agent: 3,
+            dst_agent: 2,
+            value: 100,
+            ..empty_event()
+        };
+        let mut live = setup();
+        live.active = false;
+        live.game_combat = false;
+        let generation = live.generation;
+        live.ingest(&hit, false, false);
+        assert!(
+            !live.active,
+            "Other players fighting must not start our combat"
+        );
+        live.ingest(&hit, false, true);
+        assert!(live.active);
+        assert_eq!(live.generation, generation + 1);
+        assert_eq!(fight(&live).players[2].damage, 100);
+        live.ingest(
+            &Event {
+                src_agent: 1,
+                is_statechange: 2,
+                ..empty_event()
+            },
+            true,
+            false,
+        );
+        assert!(!live.active);
+        assert!(live.dirty, "Local exit must publish the final snapshot");
+
+        live.roster.get_mut(&1).unwrap().team = 0;
+        live.roster.get_mut(&3).unwrap().team = 0;
+        live.ingest(&Event { affinity: 1, ..hit }, false, true);
+        assert!(
+            live.active,
+            "Registered squad PvP does not require team colors"
+        );
     }
 
     #[test]

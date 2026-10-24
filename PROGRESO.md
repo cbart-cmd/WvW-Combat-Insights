@@ -1,6 +1,16 @@
 # Estado del snapshot publico
 
-- Version funcional: 0.2.17, sin cambios de comportamiento respecto al addon distribuido.
+## v0.2.18
+
+- Directo por PvP propio/equipo mientras el POV esta en combate, tambien para quien solo cura.
+- Autoapertura en el primer refresco, sin el umbral de duracion de logs.
+- Combates finalizados en historial de sesion, incluidos cambios de mapa y combates entre refrescos; su log real los sustituye. Sin guardar provisionales en disco.
+- Equipo propio inicial al cambiar de informe, preservando colores manuales durante refrescos; migracion unica del antiguo valor enemigo.
+- Validacion local: 94 tests unitarios y 2 de configuracion correctos, formato y DLL release; pendiente comprobacion dentro de GW2.
+
+## Snapshot inicial v0.2.17
+
+- Version funcional inicial: 0.2.17.
 - Snapshot independiente, sin historial anterior ni workspace de otros proyectos.
 - GPL-3.0-or-later con permiso limitado de integracion; atribuciones y textos de terceros incluidos.
 - README Markdown/HTML, soporte privado de seguridad y plantilla de errores preparados.

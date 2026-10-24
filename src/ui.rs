@@ -97,6 +97,16 @@ impl Default for View {
     }
 }
 
+impl View {
+    fn set_report(&mut self, report: Option<Arc<Report>>) {
+        if self.report.as_ref().map(|r| &r.path) != report.as_ref().map(|r| &r.path) {
+            self.team = None;
+            self.select_team = true;
+        }
+        self.report = report;
+    }
+}
+
 struct Extra {
     id: u64,
     kind: usize,
@@ -117,11 +127,11 @@ struct Workspace {
 impl Workspace {
     fn select_combat(&mut self, settings: &mut Settings, report: Arc<Report>) {
         for (view, w) in self.views.iter_mut().zip(&mut settings.windows) {
-            view.report = Some(Arc::clone(&report));
+            view.set_report(Some(Arc::clone(&report)));
             w.follow_latest = false;
         }
         for extra in &mut self.extras {
-            extra.view.report = Some(Arc::clone(&report));
+            extra.view.set_report(Some(Arc::clone(&report)));
             extra.settings.follow_latest = false;
         }
     }
@@ -186,11 +196,13 @@ pub fn toggle() {
 
 fn select_report(view: &mut View, history: &[Arc<Report>], follow_latest: bool) {
     if follow_latest || view.report.is_none() {
-        view.report = history.first().cloned();
+        view.set_report(history.first().cloned());
     } else if let Some(selected) = &view.report
-        && let Some(updated) = history.iter().find(|report| report.path == selected.path)
+        && let Some(updated) = history
+            .iter()
+            .find(|report| report.path == selected.path || report.replaces(selected))
     {
-        view.report = Some(Arc::clone(updated));
+        view.set_report(Some(Arc::clone(updated)));
     }
 }
 
@@ -198,14 +210,10 @@ fn select_display(
     view: &mut View,
     history: &[Arc<Report>],
     live: Option<&Arc<Report>>,
-    combat: bool,
     follow: bool,
 ) {
-    if follow
-        && combat
-        && let Some(live) = live
-    {
-        view.report = Some(Arc::clone(live));
+    if follow && let Some(live) = live {
+        view.set_report(Some(Arc::clone(live)));
     } else {
         select_report(view, history, follow);
     }
@@ -237,7 +245,6 @@ pub fn render(ui: &Ui) {
             &mut workspace.views[kind],
             &st.history,
             st.live.as_ref(),
-            combat,
             w.follow_latest,
         );
         render_window(
@@ -267,7 +274,6 @@ pub fn render(ui: &Ui) {
             &mut extra.view,
             &st.history,
             st.live.as_ref(),
-            combat,
             extra.settings.follow_latest,
         );
         render_window(
@@ -447,6 +453,8 @@ fn render_window(
                 DIM,
                 language.text(if live.limited {
                     Text::LiveLimit
+                } else if live.finished {
+                    Text::LiveFinished
                 } else {
                     Text::Live
                 }),
@@ -491,10 +499,15 @@ fn render_window(
 }
 
 fn log_label(report: &Report, language: Language) -> String {
-    if crate::live::is_report(report) {
+    if let Some(live) = &report.live {
         return format!(
-            "{} · {}",
-            language.text(Text::Live),
+            "{} · {} · {}",
+            language.text(if live.finished {
+                Text::LiveFinished
+            } else {
+                Text::Live
+            }),
+            report.path.display(),
             i18n::format_duration(report.fight.duration_ms, language)
         );
     }
@@ -1707,7 +1720,10 @@ mod tests {
             display_teams(&report),
             vec![Team::Green, Team::Red, Team::Blue]
         );
-        report.live = Some(app::LiveStatus { limited: false });
+        report.live = Some(app::LiveStatus {
+            limited: false,
+            finished: false,
+        });
         assert_eq!(display_teams(&report), vec![Team::Green]);
         report.fight.pov_team = Some(Team::Own);
         assert_eq!(display_teams(&report), vec![Team::Own]);
@@ -1859,6 +1875,48 @@ mod tests {
     }
 
     #[test]
+    fn choosing_a_different_fight_resets_team_but_refreshing_it_preserves_manual_color() {
+        let report = |path: &str, own| {
+            Arc::new(Report {
+                path: path.into(),
+                file_name: path.into(),
+                fight: Fight {
+                    pov_team: Some(own),
+                    event_range: Some((1000, 2000)),
+                    ..Default::default()
+                },
+                parse_time: Default::default(),
+                live: None,
+            })
+        };
+        let mut view = View::default();
+        view.set_report(Some(report("one", Team::Blue)));
+        view.team = Some(Team::Red);
+        view.set_report(Some(report("one", Team::Blue)));
+        assert_eq!(view.team, Some(Team::Red));
+        view.set_report(Some(report("two", Team::Green)));
+        assert_eq!(view.team, None);
+        assert!(view.select_team);
+        assert_eq!(
+            initial_team(
+                &view.report.as_ref().unwrap().fight,
+                Settings::default().initial_team
+            ),
+            Team::Green
+        );
+
+        let mut provisional = (*report("live-1", Team::Green)).clone();
+        provisional.live = Some(app::LiveStatus {
+            limited: false,
+            finished: true,
+        });
+        view.set_report(Some(Arc::new(provisional)));
+        let real = report("real", Team::Green);
+        select_report(&mut view, &[Arc::clone(&real)], false);
+        assert!(Arc::ptr_eq(view.report.as_ref().unwrap(), &real));
+    }
+
+    #[test]
     fn summary_down_contribution_sums_only_the_selected_team() {
         let mut fight = Fight {
             players: vec![
@@ -1919,28 +1977,27 @@ mod tests {
         assert!(Arc::ptr_eq(view.report.as_ref().unwrap(), &refreshed));
         assert!(!Arc::ptr_eq(view.report.as_ref().unwrap(), &new));
         let mut live = report("");
-        Arc::make_mut(&mut live).live = Some(app::LiveStatus { limited: false });
-        select_display(&mut view, &[Arc::clone(&new)], Some(&live), true, false);
+        Arc::make_mut(&mut live).live = Some(app::LiveStatus {
+            limited: false,
+            finished: false,
+        });
+        select_display(&mut view, &[Arc::clone(&new)], Some(&live), false);
         assert!(Arc::ptr_eq(view.report.as_ref().unwrap(), &new));
-        select_display(&mut view, &[Arc::clone(&new)], Some(&live), true, true);
+        select_display(&mut view, &[Arc::clone(&new)], Some(&live), true);
         assert!(Arc::ptr_eq(view.report.as_ref().unwrap(), &live));
         let frozen = Arc::clone(&live);
         Arc::make_mut(&mut live).fight.duration_ms = 10_000;
-        select_display(&mut view, &[Arc::clone(&new)], Some(&live), true, false);
+        select_display(&mut view, &[Arc::clone(&new)], Some(&live), false);
         assert!(Arc::ptr_eq(view.report.as_ref().unwrap(), &frozen));
-        select_display(&mut view, &[Arc::clone(&new)], Some(&live), false, true);
-        assert!(Arc::ptr_eq(view.report.as_ref().unwrap(), &new));
-        select_display(&mut view, &[Arc::clone(&new)], Some(&live), true, true);
+        select_display(&mut view, &[Arc::clone(&new)], Some(&live), true);
         assert!(Arc::ptr_eq(view.report.as_ref().unwrap(), &live));
-        select_display(&mut view, &[], Some(&live), false, true);
-        assert!(
-            view.report.is_none(),
-            "Without logs, leaving combat shows waiting, not frozen live data"
-        );
-        select_display(&mut view, &[Arc::clone(&new)], None, true, true);
+        Arc::make_mut(&mut live).live.as_mut().unwrap().finished = true;
+        select_display(&mut view, &[Arc::clone(&live)], None, true);
+        assert!(Arc::ptr_eq(view.report.as_ref().unwrap(), &live));
+        select_display(&mut view, &[Arc::clone(&new)], None, true);
         assert!(Arc::ptr_eq(view.report.as_ref().unwrap(), &new));
         let mut empty = View::default();
-        select_display(&mut empty, &[Arc::clone(&new)], Some(&live), true, false);
+        select_display(&mut empty, &[Arc::clone(&new)], Some(&live), false);
         assert!(Arc::ptr_eq(empty.report.as_ref().unwrap(), &new));
     }
 
@@ -2130,6 +2187,9 @@ mod tests {
                         name: "Healer".into(),
                         profession: 1,
                         team: Some(Team::Green),
+                        damage: 10_000,
+                        weapons: vec!["Spear"],
+                        underwater_weapons: vec!["Spear"],
                         subgroup: Some(1),
                         squad_member: true,
                         healing: 820_000,
@@ -2718,7 +2778,10 @@ mod tests {
                     .collect(),
                 ..Default::default()
             },
-            live: Some(app::LiveStatus { limited: false }),
+            live: Some(app::LiveStatus {
+                limited: false,
+                finished: false,
+            }),
             ..(*large).clone()
         });
         assert_eq!(healing_rows(&all_healers.fight, 0, false).len(), 60);
@@ -2760,7 +2823,10 @@ mod tests {
             ui.render();
         }
         let live_report = Arc::new(Report {
-            live: Some(app::LiveStatus { limited: false }),
+            live: Some(app::LiveStatus {
+                limited: false,
+                finished: false,
+            }),
             fight: Fight {
                 pov_team: Some(Team::Own),
                 duration_ms: 10_000,

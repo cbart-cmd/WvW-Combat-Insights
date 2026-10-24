@@ -71,7 +71,7 @@ pub struct Settings {
     pub history_size: usize,
     /// Contar solo el dano y los strips hechos a jugadores de otro color.
     pub vs_players_only: bool,
-    /// Combates mas cortos (segundos) no abren la ventana.
+    /// Logs mas cortos (segundos) no abren la ventana; no retrasa el directo.
     pub min_duration_secs: u32,
     /// Carpeta de logs; vacia = la de arcdps.
     pub log_dir: String,
@@ -94,6 +94,13 @@ pub const MAX_HISTORY_SIZE: usize = 20;
 impl Settings {
     pub fn parse(text: &str) -> Self {
         let mut s = Self::default();
+        let own_team_layout =
+            text.lines()
+                .filter_map(|line| line.split_once('='))
+                .any(|(key, value)| {
+                    key.trim() == "layout_version"
+                        && value.trim().parse::<u32>().is_ok_and(|v| v >= 5)
+                });
         let contribution_layout =
             text.lines()
                 .filter_map(|line| line.split_once('='))
@@ -196,12 +203,15 @@ impl Settings {
                 window.width = 175.0;
             }
         }
+        if !own_team_layout && s.initial_team == 0 {
+            s.initial_team = 1;
+        }
         s
     }
 
     pub fn to_text(&self) -> String {
         let mut text = format!(
-            "layout_version=4\nhistory_size={}\nvs_players_only={}\nmin_duration_secs={}\nlog_dir={}\nhealing_sort={}\nshow_weapons={}\ninitial_team={}\n",
+            "layout_version=5\nhistory_size={}\nvs_players_only={}\nmin_duration_secs={}\nlog_dir={}\nhealing_sort={}\nshow_weapons={}\ninitial_team={}\n",
             self.history_size,
             self.vs_players_only as u8,
             self.min_duration_secs,
@@ -259,6 +269,22 @@ pub use crate::nexusbase::paths::documents;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn initial_team_defaults_to_own_and_migrates_the_old_enemy_default_once() {
+        assert_eq!(Settings::default().initial_team, 1);
+        assert_eq!(
+            Settings::parse("layout_version=4\ninitial_team=0").initial_team,
+            1
+        );
+        assert_eq!(
+            Settings::parse("layout_version=4\ninitial_team=3").initial_team,
+            3
+        );
+        let mut customized = Settings::default();
+        customized.initial_team = 0;
+        assert_eq!(Settings::parse(&customized.to_text()).initial_team, 0);
+    }
 
     #[test]
     fn cleanse_column_migrates_once_and_remains_optional() {
