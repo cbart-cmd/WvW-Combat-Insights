@@ -1,5 +1,11 @@
 # Estado del snapshot publico
 
+## v0.2.20
+
+- Solo incremento de version para comprobar la autoactualizacion desde v0.2.19.
+- Endpoint Direct, firma, datos y comportamiento conservados; no se instala manualmente en el juego.
+- Pendiente validacion y publicacion.
+
 ## v0.2.19
 
 - Endpoint Direct incorporado cambiado a raw.githubusercontent.com; firma, identidad y ajustes conservados.

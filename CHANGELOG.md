@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.20
+
+- Version-only release to test Nexus auto-update from 0.2.19 through the existing
+  direct DLL/MD5 endpoint. No behavior, identity or settings changes.
+- Do not manually install this version when testing the Nexus update flow.
+
 ## 0.2.19
 
 - Use the direct raw.githubusercontent.com DLL/MD5 endpoint with Nexus's Direct

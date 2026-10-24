@@ -1,6 +1,6 @@
 [package]
 name = "fight_analysis_danger"
-version = "0.2.19"
+version = "0.2.20"
 edition = "2024"
 description = "WvW Combat Insights: team summary, player highlights and squad healing for Nexus"
 license = "GPL-3.0-or-later"

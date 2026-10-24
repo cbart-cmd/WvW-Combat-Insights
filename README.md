@@ -4,7 +4,7 @@
 highlights and squad healing. English, Spanish, French and German UI. Official
 names and icons are bundled; displaying them does not require the wiki or API.
 
-- **[Download v0.2.19](https://github.com/cbart-cmd/gw2addonsreleases/releases/tag/fight-analysis-danger-v0.2.19)**
+- **[Download v0.2.20](https://github.com/cbart-cmd/gw2addonsreleases/releases/tag/fight-analysis-danger-v0.2.20)**
   (choose `fight_analysis_danger.dll`, not the Timers DLL).
 - [Report a bug](https://github.com/cbart-cmd/WvW-Combat-Insights/issues) |
   [Contributing](CONTRIBUTING.md) | [Security](SECURITY.md) | [Changelog](CHANGELOG.md).
