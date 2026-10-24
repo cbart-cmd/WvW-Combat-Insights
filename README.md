@@ -4,7 +4,7 @@
 highlights and squad healing. English, Spanish, French and German UI. Official
 names and icons are bundled; displaying them does not require the wiki or API.
 
-- **[Download v0.2.18](https://github.com/cbart-cmd/gw2addonsreleases/releases/tag/fight-analysis-danger-v0.2.18)**
+- **[Download v0.2.19](https://github.com/cbart-cmd/gw2addonsreleases/releases/tag/fight-analysis-danger-v0.2.19)**
   (choose `fight_analysis_danger.dll`, not the Timers DLL).
 - [Report a bug](https://github.com/cbart-cmd/WvW-Combat-Insights/issues) |
   [Contributing](CONTRIBUTING.md) | [Security](SECURITY.md) | [Changelog](CHANGELOG.md).
@@ -321,8 +321,14 @@ Copiala a `addons` del juego, o ejecuta:
 Tambien se puede usar `install.bat`. En Nexus (Ctrl+O) cargar **WvW Combat Insights**.
 No instalar una segunda DLL con otro nombre encima de la anterior.
 
-La autoactualizacion conserva el endpoint publico de
-[gw2addonsreleases](https://github.com/cbart-cmd/gw2addonsreleases), la DLL y su MD5.
+Desde v0.2.19, la autoactualizacion `Direct` usa
+[`raw.githubusercontent.com/cbart-cmd/gw2addonsreleases/main/fight_analysis_danger.dll`](https://raw.githubusercontent.com/cbart-cmd/gw2addonsreleases/main/fight_analysis_danger.dll)
+y su `.md5` (32 caracteres hexadecimales en minusculas, sin BOM ni salto de linea).
+Se conserva repositorio, rama, nombre de DLL, firma, identidad y ajustes.
+El cliente HTTP de Nexus 2026.2.17.1210 puede fallar con `Failed to read connection`
+en la URL anterior de `github.com/.../raw/...`. Las DLL antiguas conservan esa URL:
+si no pueden actualizarse, requieren sustituir manualmente una vez la DLL de la
+release, con GW2 cerrado. No copiar al juego sin autorizacion ni con GW2 abierto.
 La distribucion excluye esta DLL de Git LFS y publica tambien DLL/MD5 como assets de release.
 Si una instalacion antigua quedo sustituida por un puntero LFS de unos 130 bytes, cerrar GW2 y
 reemplazar manualmente solo la DLL por el binario verificado de la release; no borrar ajustes.

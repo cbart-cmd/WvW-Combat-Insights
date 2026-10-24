@@ -249,9 +249,14 @@ puedes instalarla con:</p>
 .\install.ps1 -Build   # tests, compilacion e instalacion</pre>
 <p>Tambien sirve install.bat. Cargar <strong>WvW Combat Insights</strong> en Nexus (Ctrl+O).
 No dejar otra copia con nombre distinto.</p>
-<p>Se mantiene la autoactualizacion de
-<a href="https://github.com/cbart-cmd/gw2addonsreleases">gw2addonsreleases</a> con DLL y MD5,
-excluyendo esta DLL de Git LFS y publicando ambos archivos como assets de release.
+<p>Desde v0.2.19, la autoactualizacion Direct usa
+<a href="https://raw.githubusercontent.com/cbart-cmd/gw2addonsreleases/main/fight_analysis_danger.dll">raw.githubusercontent.com/cbart-cmd/gw2addonsreleases/main/fight_analysis_danger.dll</a>
+y su .md5 de exactamente 32 caracteres hexadecimales en minusculas, sin BOM ni salto de linea.
+Se conservan repositorio, rama, DLL, firma, identidad y ajustes. Nexus 2026.2.17.1210
+puede fallar con <code>Failed to read connection</code> en la URL antigua github.com/.../raw/...
+que conservan las DLL ya instaladas. Si falla, requieren una sustitucion manual una vez,
+con GW2 cerrado. No copiar al juego sin autorizacion ni mientras este abierto.
+La DLL sigue excluida de Git LFS; DLL/MD5 se publican como assets de release.
 Si una instalacion antigua fue reemplazada por un puntero LFS de unos 130 bytes,
 cerrar GW2 y sustituir manualmente solo la DLL por el binario verificado, sin borrar ajustes.</p>
 <h2>Desarrollo</h2>

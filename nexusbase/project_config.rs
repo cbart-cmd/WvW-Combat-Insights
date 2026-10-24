@@ -152,6 +152,17 @@ mod tests {
             "pub const UPDATE_LINK: &str = {:?};",
             project.update_link
         )));
+        assert!(
+            project
+                .export()
+                .contains("provider: nexus::UpdateProvider::Direct")
+        );
+        if env!("CARGO_PKG_NAME") == "fight_analysis_danger" {
+            assert_eq!(
+                project.update_link,
+                "https://raw.githubusercontent.com/cbart-cmd/gw2addonsreleases/main/fight_analysis_danger.dll"
+            );
+        }
     }
 
     #[test]

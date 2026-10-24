@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.19
+
+- Use the direct raw.githubusercontent.com DLL/MD5 endpoint with Nexus's Direct
+  updater; retain addon identity, signature, data paths and user settings.
+- Pin the endpoint and Direct provider in the project configuration regression.
+- Publish the MD5 as exactly 32 lowercase hexadecimal ASCII bytes without BOM or newline.
+- Older DLLs retain the previous GitHub URL. If Nexus cannot connect, replace the
+  DLL manually once with GW2 closed; never overwrite an active game installation.
+
 ## 0.2.18
 
 - Start live reports on observed allied PvP while the local player is in combat,

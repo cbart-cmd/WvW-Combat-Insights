@@ -1,6 +1,6 @@
 name = "WvW Combat Insights"
 signature = -1178682436
-update_link = "https://github.com/cbart-cmd/gw2addonsreleases/raw/refs/heads/main/fight_analysis_danger.dll"
+update_link = "https://raw.githubusercontent.com/cbart-cmd/gw2addonsreleases/main/fight_analysis_danger.dll"
 language_key = "FIGHT_ANALYSIS_DANGER_LANGUAGE"
 data_directory = "fight_analysis_danger"
 settings_file = "settings.txt"

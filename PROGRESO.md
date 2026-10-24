@@ -1,5 +1,14 @@
 # Estado del snapshot publico
 
+## v0.2.19
+
+- Endpoint Direct incorporado cambiado a raw.githubusercontent.com; firma, identidad y ajustes conservados.
+- Regresion fija endpoint/proveedor. Reglas persistentes de GetAddonDef, MD5 exacto, LFS, cliente Nexus y verificacion de caches.
+- Versiones instaladas con URL anterior pueden necesitar una sustitucion manual autorizada con GW2 cerrado; no se instala en el juego.
+- Formato, 94 tests unitarios y 2 de configuracion, self-check de licencias e inventario correctos; compilacion release independiente.
+- GetAddonDef real v0.2.19 verificado: firma -1178682436, proveedor Direct (3), nombre y URL directa correctos.
+- Cliente original de Nexus reutilizable preparado fuera del juego; la verificacion remota se realiza tras publicar DLL/MD5, fuente y licencias.
+
 ## v0.2.18
 
 - Directo por PvP propio/equipo mientras el POV esta en combate, tambien para quien solo cura.

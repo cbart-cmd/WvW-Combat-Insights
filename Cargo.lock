@@ -140,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "fight_analysis_danger"
-version = "0.2.18"
+version = "0.2.19"
 dependencies = [
  "nexus",
  "serde",

@@ -104,3 +104,16 @@ que la DLL local. Verificar los bytes `MZ`, tamano y MD5 del asset y de la URL
 exacta de `update_link` en `addon.toml`, ademas de las URL antiguas soportadas.
 Un HTTP 200 o una URL con cache-buster no demuestran una actualizacion correcta.
 No cambiar endpoints para ocultar un problema de cache.
+
+Para GitHub con proveedor `Direct`, usar el host `raw.githubusercontent.com`
+(`https://raw.githubusercontent.com/OWNER/REPO/main/ADDON.dll`), conservando los
+nombres reales. Nexus 2026.2.17.1210 fallo con `Failed to read connection` en
+`github.com/.../raw/...`; su cliente HTTP y parser MD5 originales si funcionan
+con el host directo. Navegador/curl/HttpClient no demuestran compatibilidad:
+validar con el cliente/parser de Nexus cuando sea posible e indicar limitaciones.
+El sidecar `ADDON.dll.md5` debe ser exactamente 32 bytes ASCII hexadecimales
+en minusculas, sin BOM ni salto de linea. Verificar `GetAddonDef` de la DLL real
+(version, firma, proveedor y URL), ademas del blob preparado y descargas.
+Las DLL antiguas conservan la URL anterior y pueden requerir una sustitucion
+manual una vez: nunca copiar al juego sin autorizacion ni con GW2 abierto.
+No modificar identidad, firma, directorios de datos ni ajustes del usuario.
