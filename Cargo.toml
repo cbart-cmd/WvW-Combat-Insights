@@ -1,0 +1,31 @@
+[package]
+name = "fight_analysis_danger"
+version = "0.2.17"
+edition = "2024"
+description = "WvW Combat Insights: team summary, player highlights and squad healing for Nexus"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/cbart-cmd/WvW-Combat-Insights"
+build = "nexusbase/build.rs"
+
+[build-dependencies]
+toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
+
+[dev-dependencies]
+toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
+
+[[test]]
+name = "nexusbase_project"
+path = "nexusbase/project_config.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+nexus = { git = "https://github.com/Zerthox/nexus-rs", rev = "51bff5ab38ad11332316448b452ece1b773018cd", features = ["mumble", "rtapi", "arc"] }
+windows = { version = "0.62", features = ["Win32_System_Com", "Win32_System_SystemInformation", "Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
+
+[lib]
+crate-type = ["cdylib", "rlib"] # cdylib: DLL de Nexus; rlib: para el ejemplo de linea de comandos y los tests
+
+[profile.release]
+lto = true
+opt-level = 2

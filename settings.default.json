@@ -1,0 +1,53 @@
+{
+  "history_size": 10,
+  "vs_players_only": true,
+  "min_duration_secs": 20,
+  "log_dir": "",
+  "healing_sort": 0,
+  "show_weapons": true,
+  "initial_team": 0,
+  "windows": [
+    {
+      "enabled": true,
+      "visible": true,
+      "auto_show": true,
+      "hide_in_combat": false,
+      "fixed_position": false,
+      "locked": false,
+      "position": [391, 1],
+      "width": 259,
+      "height": 78,
+      "columns": 6,
+      "opacity": 0.49,
+      "follow_latest": false
+    },
+    {
+      "enabled": true,
+      "visible": true,
+      "auto_show": true,
+      "hide_in_combat": false,
+      "fixed_position": false,
+      "locked": false,
+      "position": [233, 624],
+      "width": 300,
+      "height": 112,
+      "columns": 14,
+      "opacity": 0.38,
+      "follow_latest": false
+    },
+    {
+      "enabled": true,
+      "visible": true,
+      "auto_show": true,
+      "hide_in_combat": false,
+      "fixed_position": false,
+      "locked": false,
+      "position": [0, 624],
+      "width": 234,
+      "height": 116,
+      "columns": 14,
+      "opacity": 0.32,
+      "follow_latest": false
+    }
+  ]
+}

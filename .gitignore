@@ -1,0 +1,18 @@
+target/
+
+# Local credentials, editor workspaces and private combat recordings.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.code-workspace
+.vscode/
+*.evtc
+*.zevtc
+*.evtc.zip
+*.log
+settings.txt
+arcdps.ini

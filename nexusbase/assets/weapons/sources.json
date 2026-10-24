@@ -1,0 +1,261 @@
+{
+  "description": "Unmodified official Guild Wars 2 basic weapon item icons, bundled for offline display; not skill icons.",
+  "copyright": "Guild Wars 2 artwork \u00a9 ArenaNet LLC. All rights reserved. Not CC0 or MIT.",
+  "terms": "https://www.guildwars2.com/en/legal/guild-wars-2-content-terms-of-use/",
+  "skill_sources": [
+    "https://api.guildwars2.com/v2/skills?ids=all&lang=en",
+    "https://api.guildwars2.com/v2/professions?ids=all&lang=en"
+  ],
+  "evtc_source": "https://www.deltaconnected.com/arcdps/evtc/README.txt",
+  "weapon_set_source": "https://github.com/baaron4/GW2-Elite-Insights-Parser/blob/master/GW2EI.Library/GW2EI.Services/GW2EIEvtcParser/ParserHelpers/ArcDPSEnums.cs",
+  "weapon_sets": {
+    "land": [
+      4,
+      5
+    ],
+    "aquatic": [
+      0,
+      1
+    ],
+    "kit": 2,
+    "transform": 3
+  },
+  "aquatic_spear_skills": [
+    9189,
+    9190,
+    9191,
+    9192,
+    9193,
+    10251,
+    10255,
+    10315,
+    10316,
+    10317,
+    10318,
+    10325,
+    10616,
+    10617,
+    10619,
+    10692,
+    10693,
+    10694,
+    10695,
+    12552,
+    12553,
+    12555,
+    12556,
+    12557,
+    12559,
+    12561,
+    12630,
+    13068,
+    13069,
+    13070,
+    13119,
+    13120,
+    13121,
+    13122,
+    13125,
+    13130,
+    14437,
+    14438,
+    14439,
+    14440,
+    14441,
+    14448,
+    14480,
+    28692,
+    28714,
+    28797,
+    28815,
+    28827,
+    28915,
+    28930,
+    44864,
+    50379,
+    50417,
+    63065
+  ],
+  "inference_notes": [
+    "Prefer direct player AnimationStart(67), legacy activations or SkillCast(result=11).",
+    "Only cast-less actors fall back to positive direct strikes with matching profession/palette.",
+    "Unknown/transformed/proc/pet skills are not equipped-weapon evidence.",
+    "No arbitrary weapon-count cap; elite restrictions ignored for Weaponmaster Training.",
+    "Spear aquatic use requires its audited underwater skill palette; land spear is not aquatic.",
+    "Same-profession reflections cannot always be distinguished for cast-less sources.",
+    "Incomplete animation/palette coverage can omit a weapon; no claim of a full loadout."
+  ],
+  "icons": [
+    {
+      "weapon": "Axe",
+      "file": "axe.png",
+      "item_id": 30705,
+      "item_name": "Mighty Axe",
+      "api_url": "https://api.guildwars2.com/v2/items/30705?lang=en",
+      "image_url": "https://render.guildwars2.com/file/F0386CA4B7B424B01B54D7724D12A3DF09203E6D/66151.png",
+      "sha256": "ae1c395d3dad2842e10d8004624748f7f2244abfe5954d369e2931d3cc9d6e5d"
+    },
+    {
+      "weapon": "Dagger",
+      "file": "dagger.png",
+      "item_id": 30756,
+      "item_name": "Mighty Dagger",
+      "api_url": "https://api.guildwars2.com/v2/items/30756?lang=en",
+      "image_url": "https://render.guildwars2.com/file/BDAAF7437FD44F2AA7592F0A1EC5F9EEC690F635/66164.png",
+      "sha256": "4853f42c91ffd66993b5a4c22eef091c981ddf97e3c50a92262d749afc0a0f3d"
+    },
+    {
+      "weapon": "Focus",
+      "file": "focus.png",
+      "item_id": 30779,
+      "item_name": "Mighty Focus",
+      "api_url": "https://api.guildwars2.com/v2/items/30779?lang=en",
+      "image_url": "https://render.guildwars2.com/file/0F3FED6ECD0A990BBC5B29501F590FC7052776CF/66170.png",
+      "sha256": "9d96323d7af85c7d37dcd228c896e1b9f39d32d3d8a6b400b6654e173353b09a"
+    },
+    {
+      "weapon": "Greatsword",
+      "file": "greatsword.png",
+      "item_id": 30796,
+      "item_name": "Mighty Greatsword",
+      "api_url": "https://api.guildwars2.com/v2/items/30796?lang=en",
+      "image_url": "https://render.guildwars2.com/file/67B2C9A40C0E963567B7B42359A327B19F56195D/66176.png",
+      "sha256": "cc3ae6d14c46a52e7d11a12dcc0c6c0a75d5d97102b1311d05eb72c6ff2ea082"
+    },
+    {
+      "weapon": "Hammer",
+      "file": "hammer.png",
+      "item_id": 30813,
+      "item_name": "Mighty Hammer",
+      "api_url": "https://api.guildwars2.com/v2/items/30813?lang=en",
+      "image_url": "https://render.guildwars2.com/file/993ED9650B92F3589ED0D350F8370170F329F450/66178.png",
+      "sha256": "11f1eae9972821e855fcdf0f4e4d85785f7668690b709e4da0eb77ea9e48b6a8"
+    },
+    {
+      "weapon": "Longbow",
+      "file": "longbow.png",
+      "item_id": 30722,
+      "item_name": "Mighty Longbow",
+      "api_url": "https://api.guildwars2.com/v2/items/30722?lang=en",
+      "image_url": "https://render.guildwars2.com/file/4FA22FDDFD0A2BE9654504E608FB6D5D0295CE0C/66157.png",
+      "sha256": "5afe67ea677cbaa2869721f6cae0b65384d37f65a88dede4483a1f3a25f482c5"
+    },
+    {
+      "weapon": "Mace",
+      "file": "mace.png",
+      "item_id": 30830,
+      "item_name": "Mighty Mace",
+      "api_url": "https://api.guildwars2.com/v2/items/30830?lang=en",
+      "image_url": "https://render.guildwars2.com/file/6E350F079207B60BFBD5A54A9F14E667677E0016/66184.png",
+      "sha256": "d961914de1a782ff3a8e2fe1c6991a646ca50d076df1d7aa85a54401693f41b2"
+    },
+    {
+      "weapon": "Pistol",
+      "file": "pistol.png",
+      "item_id": 30847,
+      "item_name": "Mighty Pistol",
+      "api_url": "https://api.guildwars2.com/v2/items/30847?lang=en",
+      "image_url": "https://render.guildwars2.com/file/B4BA303072A62C0AB73A0CBAF0632A38D8B4794A/66190.png",
+      "sha256": "0320cb2dcd92f8e6ff548e80e6c2a4de4cf15935a41f1235bb721f0201015cfb"
+    },
+    {
+      "weapon": "Rifle",
+      "file": "rifle.png",
+      "item_id": 30864,
+      "item_name": "Mighty Rifle",
+      "api_url": "https://api.guildwars2.com/v2/items/30864?lang=en",
+      "image_url": "https://render.guildwars2.com/file/05909FE40ACD31F0201E02DD7E03C41ABD9CC401/66196.png",
+      "sha256": "b2d244eae4cdf6c49b16637c0644c0800d30242a2cff5789ca30fcc2bfb7c25b"
+    },
+    {
+      "weapon": "Scepter",
+      "file": "scepter.png",
+      "item_id": 30881,
+      "item_name": "Mighty Scepter",
+      "api_url": "https://api.guildwars2.com/v2/items/30881?lang=en",
+      "image_url": "https://render.guildwars2.com/file/40539A620E4FF85EEE0D104BBE234E185142A2CC/66202.png",
+      "sha256": "4fd540149a1c62ea8676378f2cd76c1f3c20587119f5cd9bf340176595529d95"
+    },
+    {
+      "weapon": "Shield",
+      "file": "shield.png",
+      "item_id": 30966,
+      "item_name": "Mighty Shield",
+      "api_url": "https://api.guildwars2.com/v2/items/30966?lang=en",
+      "image_url": "https://render.guildwars2.com/file/7DB35F1B7E15540C901650FE08B635FC7F01C852/66208.png",
+      "sha256": "4ee08f66be4d52ce339d9a3182fb716545ec95efe1677e22d3732959d91a7654"
+    },
+    {
+      "weapon": "Shortbow",
+      "file": "shortbow.png",
+      "item_id": 30739,
+      "item_name": "Mighty Short Bow",
+      "api_url": "https://api.guildwars2.com/v2/items/30739?lang=en",
+      "image_url": "https://render.guildwars2.com/file/32AE4DE8B03E026B54E1726C6EFBD5FAF4C09DD9/67395.png",
+      "sha256": "00aa2d38405237a99810ccceabe49802a1f45052d6c740faa401a816a06c2d52"
+    },
+    {
+      "weapon": "Spear",
+      "file": "spear.png",
+      "item_id": 30762,
+      "item_name": "Dragonspine",
+      "api_url": "https://api.guildwars2.com/v2/items/30762?lang=en",
+      "image_url": "https://render.guildwars2.com/file/0A4416F8145D073822FB0AA8E6DB1EE09110DDDE/780590.png",
+      "sha256": "7fd986c072b964509fe41afb95bee65754930d8df535df97114a5a4927f54b4d"
+    },
+    {
+      "weapon": "Speargun",
+      "file": "speargun.png",
+      "item_id": 30766,
+      "item_name": "Strong Krytan Speargun",
+      "api_url": "https://api.guildwars2.com/v2/items/30766?lang=en",
+      "image_url": "https://render.guildwars2.com/file/A44FA6A23E80D5519D279012FA0B257135EA75C1/61718.png",
+      "sha256": "a591fd8a24f8c34bcc7a4aa96a486c2fcf3414cf11e22327fe39d3e0ca2ccb25"
+    },
+    {
+      "weapon": "Staff",
+      "file": "staff.png",
+      "item_id": 30898,
+      "item_name": "Mighty Staff",
+      "api_url": "https://api.guildwars2.com/v2/items/30898?lang=en",
+      "image_url": "https://render.guildwars2.com/file/FA1C40555C74D2BAAED3729F7B2560F517E2171A/66214.png",
+      "sha256": "962fd7dcf16f0197d332135c5cb491a4c4b92af11e3734a5580fa5cd3c20f4f8"
+    },
+    {
+      "weapon": "Sword",
+      "file": "sword.png",
+      "item_id": 30915,
+      "item_name": "Mighty Sword",
+      "api_url": "https://api.guildwars2.com/v2/items/30915?lang=en",
+      "image_url": "https://render.guildwars2.com/file/4208D4020193450C234C0DC55F7EFCFAB236007B/66216.png",
+      "sha256": "80ce432bb03797d09bb63955ecace5b6f31e7808c3bb7c9e664598d59bf1dadc"
+    },
+    {
+      "weapon": "Torch",
+      "file": "torch.png",
+      "item_id": 30932,
+      "item_name": "Mighty Torch",
+      "api_url": "https://api.guildwars2.com/v2/items/30932?lang=en",
+      "image_url": "https://render.guildwars2.com/file/5B92FF4408386F02FB75F2034F2DCDBF53DDA206/66218.png",
+      "sha256": "7d6723bd5a2aa53ac54513fbf144326c2664500b21170bd8b56237d4becfa237"
+    },
+    {
+      "weapon": "Trident",
+      "file": "trident.png",
+      "item_id": 30758,
+      "item_name": "Strong Jeweled Trident",
+      "api_url": "https://api.guildwars2.com/v2/items/30758?lang=en",
+      "image_url": "https://render.guildwars2.com/file/60D13E23AA2C99D2D12469D6C3BB53A93473009E/779954.png",
+      "sha256": "fbec069ead296535889fa7fe816d724b38d2aab75027833f1ef8ee40b740bc4b"
+    },
+    {
+      "weapon": "Warhorn",
+      "file": "warhorn.png",
+      "item_id": 30949,
+      "item_name": "Mighty Warhorn",
+      "api_url": "https://api.guildwars2.com/v2/items/30949?lang=en",
+      "image_url": "https://render.guildwars2.com/file/F464B3A80B0EFF2105630C0E48BBC6C5CA1CB651/66224.png",
+      "sha256": "bae9732509cbabca057a026d62c414cde3ec344e80ef4d37aaebd241b7a61f78"
+    }
+  ]
+}

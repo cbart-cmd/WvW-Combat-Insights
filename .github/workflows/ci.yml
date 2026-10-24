@@ -1,0 +1,70 @@
+name: Windows checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Prepare Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup default stable
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Fetch locked dependencies for all target notices
+        run: cargo fetch --locked
+      - name: Test all targets
+        run: cargo test --locked --all-targets
+      - name: Test notice collector
+        run: python tools\collect_licenses.py --test
+      - name: Check third-party notices
+        run: python tools\collect_licenses.py --check
+      - name: Build release DLL
+        run: cargo build --locked --release
+      - name: Prepare binary verification and matching source
+        run: |
+          $dll = 'target\release\fight_analysis_danger.dll'
+          $bytes = [IO.File]::ReadAllBytes((Resolve-Path $dll))
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) {
+            throw 'Release output is not a Windows PE binary.'
+          }
+          foreach ($algorithm in @('SHA256', 'MD5')) {
+            $hash = (Get-FileHash $dll -Algorithm $algorithm).Hash.ToLowerInvariant()
+            Set-Content "$dll.$($algorithm.ToLowerInvariant())" $hash -Encoding ascii
+          }
+          git archive --format=zip --output=target\release\source.zip HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: wvw-combat-insights-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            target/release/fight_analysis_danger.dll
+            target/release/fight_analysis_danger.dll.sha256
+            target/release/fight_analysis_danger.dll.md5
+            target/release/source.zip
+            LICENSE
+            ADDITIONAL-PERMISSION.md
+            THIRD-PARTY-NOTICES.md
+            THIRD-PARTY-LICENSES.txt

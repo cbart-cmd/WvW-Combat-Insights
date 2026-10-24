@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WvW Combat Insights</title>
+<style>
+body { font-family: Segoe UI, sans-serif; max-width: 900px; margin: 2em auto; padding: 0 1em; background: #1e1f22; color: #ddd; line-height: 1.6; }
+h1, h2 { color: #f0c060; } a { color: #7fb4ff; }
+code, pre { background: #2b2d31; border-radius: 4px; } code { padding: 1px 4px; }
+pre { padding: 1em; overflow-x: auto; } table { border-collapse: collapse; }
+th, td { border: 1px solid #555; padding: 5px 12px; text-align: left; }
+.notice { border-left: 4px solid #f0c060; padding: .5em 1em; background: #2b2d31; }
+</style>
+</head>
+<body>
+<h1>WvW Combat Insights</h1>
+<p lang="en"><strong>English:</strong> Unofficial Guild Wars 2 WvW addon for Nexus:
+team overview, player highlights and squad healing. English, Spanish, French and
+German UI. Official names and icons are bundled; no wiki/API access is needed to display them.</p>
+<p><strong><a href="https://github.com/cbart-cmd/gw2addonsreleases/releases/tag/fight-analysis-danger-v0.2.17">Download v0.2.17</a></strong>
+(choose <code>fight_analysis_danger.dll</code>, not Timers).
+<a href="https://github.com/cbart-cmd/WvW-Combat-Insights/issues">Report a bug</a> |
+<a href="CONTRIBUTING.md">Contributing</a> |
+<a href="SECURITY.md">Security</a> |
+<a href="CHANGELOG.md">Changelog</a>.</p>
+<p lang="en"><strong>Quick install:</strong> install Nexus and arcdps, enable WvW logging,
+close GW2, copy the downloaded DLL to the game's <code>addons</code> folder and load
+WvW Combat Insights in Nexus (Ctrl+O) after reopening the game.
+Healing Stats supplies healing/barrier data; condition cleanses do not require it.
+WvW Fight Analysis is optional. No compilation is needed.</p>
+<p>Codigo propio bajo <strong>GPL-3.0-or-later</strong> con
+<a href="ADDITIONAL-PERMISSION.md">permiso limitado de integracion GW2/Nexus/arcdps</a>;
+recursos del juego y dependencias
+con sus condiciones originales. <a href="THIRD-PARTY-NOTICES.md">Licencia y atribuciones</a>.</p>
+<p><strong>Desarrollo v0.2.17:</strong> infraestructura reutilizable en
+<a href="nexusbase/README.md">nexusbase</a>, con el mismo contrato que Timers.
+Identidad, firma, <code>update_link</code> y rutas en <a href="addon.toml">addon.toml</a>,
+validado al compilar e incorporado en la DLL. Version en Cargo.toml; no cambian las
+funciones ni los ajustes personales. La guia de nexusbase documenta nuevos addons y agentes de IA.</p>
+<p>Resumen de equipos, jugadores destacados y healing de tus combates WvW.
+Addon de <a href="https://raidcore.gg/Nexus">Nexus</a> para Guild Wars 2, compatible con
+<a href="https://github.com/jake-greygoose/WvW-Fight-Analysis-Addon">WvW Fight Analysis</a>.</p>
+<p>Antes <strong>Fight Analysis Danger</strong>. Se conserva <code>fight_analysis_danger.dll</code>,
+la firma, el endpoint de actualizacion y la carpeta de ajustes. No hay que renombrar ni reinstalar.
+El historial es temporal y se reconstruye desde los logs tras reiniciar.</p>
+<p>Definiciones y diferencias frente a AxiBridge/AxiLog:
+<a href="calculos.md">auditoria de calculos</a>. Down contribution adopta desde v0.2.10
+la metodologia nativa de AxiLog; las demas diferencias siguen documentadas.</p>
+
+<h2>Tres ventanas independientes</h2>
+<p>En <strong>Nexus → Addons → WvW Combat Insights</strong> hay tres pestanas.
+Puedes activar una, dos o las tres ventanas. En nuevas instalaciones las tres estan habilitadas y visibles.
+Cerrar una no cierra las otras; la apertura automatica puede volver a mostrarla tras otro combate valido.</p>
+<table>
+<thead><tr><th>Ventana</th><th>Contenido</th><th>Tamano inicial</th></tr></thead>
+<tbody>
+<tr><td>Resumen</td><td>Tres colores, jugadores, kills, dano total, corrups totales y down c por equipo. Corrups cuenta retiradas de boons (strips), como Destacados. Down c suma el Down contribution de los jugadores del color; cabecera con ayuda del nombre completo y total sin abreviar en el tooltip del equipo. Tu equipo primero, sin asterisco. Celdas de la altura exacta del texto.</td><td>259 px</td></tr>
+<tr><td>Jugadores destacados</td><td>Pestanas de colores presentes en el combate. Icono de especializacion, nombre, dano, corrups y Down contribution por defecto; columnas configurables. Armas en texto.</td><td>300 px</td></tr>
+<tr><td>Healing</td><td>Una linea por jugador: icono de clase, nombre, curas, barrera y limpias por defecto. Columnas configurables, sin barras ni bordes.</td><td>234 px, todas las filas disponibles con scroll</td></tr>
+</tbody>
+</table>
+<p>Clicar un color o sus kills en Resumen activa y muestra Destacados con ese equipo y combate.
+Los tooltips muestran nombre del equipo, kills, muertes y derribos. Los totales incluyen todos
+los jugadores registrados del color, no solo el escuadron ni la poblacion actual del mapa.</p>
+<p>Destacados permite elegir equipo desde pestanas de color o el menu contextual: solo muestra colores presentes en el combate, incluido el aliado.
+Muestra los jugadores del equipo con dano o corrups registrados, con scroll y sin duplicados; oculta quienes tienen ambos a cero.
+Orden inicial por <strong>dano total + corrups × 2000 + Down contribution</strong>, sin columna de puntuacion visible.
+Ranking y cifras en cache; las filas fuera de la vista no generan textos, iconos ni tooltips de jugador.
+Las armas aparecen como texto discreto traducido, por ejemplo Lanza · Mandoble, en una linea de la altura del texto.
+Se recorta con puntos suspensivos cuando no cabe y el tooltip conserva todos los nombres.
+El uso subacuatico identificado se marca en azul. Se mantienen los iconos de clase/especializacion.
+<strong>Clic derecho → Mostrar armas</strong>, activado por defecto, permite ocultar toda la segunda linea
+sin dejar espacio vacio. Comparte el ajuste guardado de la pestana Destacados de Nexus,
+tambien para ventanas adicionales; se respeta una preferencia ya guardada.
+Se infieren de habilidades usadas: no confirman equipamiento, manos ni conjuntos de armas.
+Se priorizan lanzamientos reales y paletas de profesion, evitando proyectiles reflejados, procs,
+condiciones y mascotas. Sin lanzamientos, una reflexion de la misma profesion puede seguir siendo ambigua.
+Conjuntos 4/5 identifican tierra y 0/1 agua: una lanza terrestre no se marca azul por su tipo.
+Fuentes, atribucion y hashes de los 19 iconos en
+<a href="nexusbase/assets/weapons/sources.json">nexusbase/assets/weapons/sources.json</a>.
+El tooltip del jugador conserva su nombre completo, especializacion y subgrupo.
+El tooltip muestra las cuatro metricas y el desglose directo/condiciones. <strong>Clic derecho → Estadisticas</strong>
+permite combinar DPS, dano, corrups y Down contribution; las tres ultimas por defecto. Clicar una cabecera numerica ordena por ella y repetir el clic invierte el orden. <strong>Copiar</strong> conserva
+la lista completa en el orden actual y <strong>Chat</strong> copia la lista compacta del equipo seleccionado (puede superar el limite del chat).
+<strong>Estadisticas → Dano + corrups × 2000 + Down contribution</strong> recupera el orden ponderado.</p>
+<p>La cabecera se abrevia <strong>down c</strong>; al pasar el raton muestra solo <strong>Down contribution</strong>.</p>
+<p><strong>Down contribution</strong> sigue la metodologia nativa de AxiBridge/AxiLog 1.16.0:
+dano a jugadores de otro color desde la ultima salud registrada &gt;=99 % menos 2 s hasta el resultado
+de derribo, ambos limites inclusivos. Sin ancla usa el inicio del log; el siguiente intervalo empieza
+como minimo 2,1 s despues del down anterior. Incluye condiciones y mascotas resueltas temporalmente,
+excluye CC/breakbar y no infiere downs solo por cambios de estado. Sin intervalo configurable.
+Conservamos tres colores y filas por agente: no garantiza igualdad de totales con su informe de escuadron.
+Detalles en <a href="calculos.md">calculos.md</a>. Se suma sin multiplicador al ranking.
+Los tooltips no explican la formula.</p>
+<p>Healing ordena inicialmente por curas + barreras, configurable desde su pestana.
+El tooltip del jugador conserva las cifras de limpias, sin la explicacion larga de retiradas al escuadron.
+Muestra todos los jugadores con datos disponibles, sin limite de filas ni filas ficticias; scroll al superar el alto de la ventana. El icono de clase precede al nombre.
+No hay barras apiladas ni botones permanentes. <strong>Clic derecho → Estadisticas → Columnas</strong> permite
+curas, barrera y limpias (las tres por defecto), y opcionalmente total de curas + barrera. Los tooltips muestran las cifras completas, aportacion por segundo y subgrupo.
+La cabecera <strong>Parcial</strong> conserva el aviso de cobertura con ayuda detallada.
+La copia al portapapeles esta en el menu contextual.</p>
+<p><strong>Limpias</strong>: retiradas completas de condiciones realizadas sobre el escuadron registrado, incluidas las propias;
+una por condicion, no por acumulacion. Excluye expiraciones, retiradas sinteticas y objetivos enemigos.
+Se atribuyen mascotas conocidas y se respeta la pertenencia al escuadron en el momento del evento.
+Se lee de EVTC normal, <strong>sin requerir Healing Stats</strong>: pueden aparecer jugadores con solo limpias y curas/barreras no disponibles.
+Tambien permite ordenar por limpias.</p>
+<p class="notice">Los EVTC normales no contienen todos los datos de healing: se necesitan eventos compatibles
+de la extension de estadisticas de curacion de arcdps. Se distinguen datos ausentes/incompatibles,
+grupo no identificable y cobertura parcial. Nunca se convierten datos ausentes en ceros.
+Las cifras registradas no equivalen a curacion efectiva tras descontar sobrecuracion.
+Compartir color no demuestra pertenencia al grupo/escuadron.</p>
+<p>Se admiten revisiones 1 y 2 con firma <code>0x9c9b3c99</code>
+(<a href="https://github.com/Krappa322/arcdps_healing_stats/blob/master/src/AddonVersion.h">protocolo</a>).
+Emisor y receptor deben pertenecer al escuadron registrado del POV. La cobertura se considera
+conservadoramente parcial, nunca completa por ausencia de errores. Una metrica sin datos aparece como
+<code>-</code>; las cifras de la ventana no llevan <code>&gt;=</code>. Un total con una parte no disponible
+conserva la advertencia en el tooltip y la copia detallada.
+Los valores no disponibles se ordenan al final, no como ceros.</p>
+<p>Se atribuyen mascotas con propietario identificable y se eliminan ecos identicos entre peers.
+IDs/propietarios irresolubles se omiten; ticks genuinos indistinguibles de un eco pueden quedar
+infracontados. Los logs reales validan la lectura, no equivalencia numerica con Elite Insights.</p>
+
+<h2>Posicion, historial y ventanas adicionales</h2>
+<p>Todas las ventanas, incluidas las adicionales, se ocultan durante pantallas de carga y seleccion de personaje
+segun el estado de gameplay de Nexus. Reaparecen al volver a WvW sin cambiar preferencias ni informes.</p>
+<h3>Datos provisionales en directo (v0.2.13)</h3>
+<p>Desde v0.2.15, pegar solo a NPCs no inicia ni sustituye el directo ni activa <strong>Ocultar en combate</strong>.
+Se exige dano observado entre tu personaje (o mascota de propietario identificado) y un jugador enemigo identificado.
+Tras detectar PvP, el combate se mantiene hasta salir del combate de GW2, aunque despues pegues solo a NPCs.
+Sin eventos del bridge no se puede detectar PvP y el combate generico no oculta ventanas.</p>
+<p><strong>Seguir el ultimo combate / Follow latest fight</strong> muestra el combate en curso en las tres ventanas y las adicionales,
+con actualizacion aproximada cada segundo y la marca <strong>En directo · provisional</strong>.
+Requiere arcdps y <a href="https://github.com/RaidcoreGG/GW2-Arcdps-Integration">ArcDPS Integration</a> de Nexus.
+No consulta cifras acumuladas ni recupera eventos anteriores a la carga del addon.
+Las metricas usan solo el flujo de escuadron y reutilizan los calculos EVTC; el flujo local detecta el combate y aporta metadatos, sin duplicar importes.</p>
+<p>Durante el directo de <strong>Follow latest fight</strong>, Resumen y Destacados muestran <strong>solo nuestro equipo</strong>,
+sin filas/pestanas de otros colores, tambien en ventanas adicionales y menu de color. Los logs fuera de combate conservan los tres colores.
+Desde v0.2.16 el dano/DPS, corrups y contribucion usan IDs de equipo o afinidad hostil de arcdps contra jugadores identificados:
+no requieren correspondencias de colores. Sin color propio verificado se muestra <strong>Nuestro equipo</strong> en tono neutro.
+Los datos de equipo de cada identidad se actualizan con los nuevos eventos.
+Curas/barreras necesitan eventos y metadatos de Healing Stats compatibles entregados por el bridge:
+instalar la extension no garantiza esa cobertura. Los datos ausentes siguen como <code>-</code>.
+Al alcanzar el limite de seguridad de 1.000.000 eventos aparece un aviso de directo incompleto; no se descarta silenciosamente el inicio.</p>
+<p>Al salir de combate, <strong>Seguir el ultimo combate</strong> muestra inmediatamente el <strong>ultimo log analizado</strong>;
+cuando llega el nuevo log, muestra ese. Sin logs, muestra la espera, no el directo congelado.
+No entra en el historial; un nuevo combate empieza desde cero y un log antiguo no borra uno nuevo en curso.
+Elegir un log desactiva el directo en todas las ventanas y conserva el informe elegido.
+Sin eventos del bridge sigue funcionando el seguimiento de logs.
+El ajuste antiguo <code>healing_rows</code> se ignora y deja de guardarse: ni ranking ni copia tienen ya ese recorte.</p>
+<ul>
+<li>Cada pestana guarda activacion, visibilidad, apertura automatica, ocultacion en combate,
+posicion X/Y, posicion fija, bloqueo de movimiento, ancho, alto, columnas y opacidad.</li>
+<li>Bloquear no impide usar botones. Restablecer posicion recupera ventanas; las posiciones se ajustan
+al area visible al cambiar de resolucion.</li>
+<li><strong>Clic derecho sobre la ventana o titulo → Historial</strong> muestra los logs, del mas nuevo al mas antiguo, con fecha/hora y duracion.
+Elegir uno cambia <strong>todas las ventanas</strong>, incluidas las adicionales, y mantiene abierto el selector para elegir otros logs sin volver a abrirlo.
+Seguir el ultimo combate reactiva el seguimiento para todas.</li>
+<li>En Destacados y Healing, <strong>Clic derecho → Abrir otra ventana</strong> crea otra instancia con equipo,
+columnas, posicion y tamano propios, pero navegacion de combates compartida. Esas ventanas son temporales.</li>
+<li>Menu estilo arcdps: <strong>Historial, Color, Estadisticas, Estilo y Posicion</strong>.
+No hay selector de logs, tres puntos ni flecha de colapsar en el cuerpo.
+No se muestra la fila «Historial: N combates cargados»; se conservan los errores y estados de analisis.
+Historial incluye Analizar ultimo log y Reprocesar ultimos N combates.</li>
+<li><strong>Estilo</strong> ajusta ancho (125–1000 px) y opacidad. Fondo y titulo al <strong>49 / 38 / 32 %</strong> en Resumen / Destacados / Healing,
+sin atenuar texto ni iconos. <strong>Posicion</strong> ofrece X/Y, bloqueo y recuperacion.</li>
+<li>Arrastrar la <strong>esquina inferior derecha</strong> redimensiona cualquier ventana y guarda ancho y alto,
+incluso con posicion fija o movimiento bloqueado. Restablecer estilo recupera el alto compacto inicial.</li>
+<li><strong>ALT+SHIFT+P</strong> muestra/oculta las ventanas principales activadas; configurable en Nexus.</li>
+<li>Solo se muestran en mapas WvW, incluidas salas y mapas auxiliares. Fuera de ellos se conservan
+preferencias e historial; las opciones de Nexus siguen disponibles.</li>
+</ul>
+<h2>Opciones compartidas y compatibilidad</h2>
+<table>
+<tr><th>Ajuste</th><th>Por defecto</th></tr>
+<tr><td>Apertura automatica / ocultar en combate</td><td>Si / No, por ventana</td></tr>
+<tr><td>Posicion fija / bloqueo</td><td>No, por ventana</td></tr>
+<tr><td>Ventanas habilitadas / visibles</td><td>Las tres</td></tr>
+<tr><td>Ancho Resumen / Destacados / Healing</td><td>259 / 300 / 234 px</td></tr>
+<tr><td>Alto Resumen / Destacados / Healing</td><td>78 / 112 / 116 px</td></tr>
+<tr><td>Opacidad Resumen / Destacados / Healing</td><td>49 / 38 / 32 %</td></tr>
+<tr><td>Posicion X/Y Resumen / Destacados / Healing</td><td>391,1 / 233,624 / 0,624</td></tr>
+<tr><td>Seguir el ultimo combate</td><td>No</td></tr>
+<tr><td>Destacados</td><td>Con dano o corrups; dano + corrups × 2000 + Down contribution</td></tr>
+<tr><td>Down contribution</td><td>Metodologia nativa AxiLog; sin intervalo configurable</td></tr>
+<tr><td>Historial</td><td>10 combates (1–20)</td></tr>
+<tr><td>Duracion minima de apertura</td><td>20 s</td></tr>
+<tr><td>Dano y strips solo contra jugadores</td><td>Si</td></tr>
+<tr><td>Carpeta de logs</td><td>La de arcdps</td></tr>
+</table>
+<p>Las opciones compartidas estan debajo de las tres pestanas. Los ajustes siguen en
+<code>Documentos\Guild Wars 2\addons\fight_analysis_danger\settings.txt</code>, migrando visibilidad,
+apertura y ocultacion antiguas. Las kills, muertes y derribos de jugadores no dependen del filtro de dano/strips.</p>
+<p>Los anchos predeterminados anteriores (380/480/520 px) migran a 175 px; otros anchos personalizados se conservan.
+<strong>Estilo → Tamano y opacidad por defecto</strong> recupera el nuevo aspecto sin borrar ajustes.</p>
+<p>Los valores iniciales se han actualizado desde la configuracion del juego del 22/10/2026, incluidos los cambios del menu derecho
+(tamano, columnas, opacidad y visibilidad en combate), sin bloqueo de movimiento ni posicion fija.
+Se aplican a nuevas instalaciones o ajustes ausentes, sin sustituir preferencias guardadas.
+<strong>Habilitar ventana</strong> permite usarla y abrirla automaticamente; <strong>Visible ahora</strong> solo controla su visibilidad actual.</p>
+<p>La fuente unica de valores iniciales es <a href="settings.default.json">settings.default.json</a>,
+incluida en la DLL al compilar. El array windows contiene Resumen, Destacados y Healing, en ese orden.
+La mascara columns usa 1 = DPS/total, 2 = dano/curas, 4 = strips/barrera, 8 = Down contribution/limpias.
+Destacados y Healing usan 14 por defecto. Ajustes anteriores a layout_version=3 incorporan limpias una sola vez;
+despues se puede ocultar y guardar esa preferencia, sin cambiar tamanos, posiciones ni opacidades.
+Los anteriores a layout_version=4 incorporan Down contribution una sola vez, tambien ocultable.
+Desde v0.2.10 se eliminan top, top_dps, top_strips y down_contribution_secs:
+se ignoran al cargar ajustes antiguos y no se vuelven a escribir al guardar.
+Las demas preferencias se conservan. El ejemplo CLI mantiene su argumento independiente de limite de filas.
+Editar el JSON requiere recompilar; no sobrescribe el archivo personal ni cambia su formato clave=valor.
+Se valida con deserializacion tipada serde/serde_json y tests de limites y compatibilidad.</p>
+<p>Interfaz, ayudas, estados, errores y resumenes en espanol, ingles, frances y aleman.
+Idioma automatico desde RealTime, Unofficial Extras, el log mas reciente y Nexus/ingles como respaldo.
+Consultar un log antiguo no cambia el idioma. Nombres oficiales e iconos de clases/especializaciones
+incluidos en la DLL, sin Internet al jugar.</p>
+<p><strong>Mantener Ctrl derecho</strong> (a la derecha de la barra espaciadora)
+muestra temporalmente todo el addon en ingles: ventanas principales/adicionales, menus,
+opciones, tooltips y textos copiados mientras esta pulsado. Al soltarlo vuelve al idioma
+automatico; si ya era ingles, no cambia. Solo funciona con el juego en primer plano.
+No guarda ajustes, reprocesa logs ni bloquea la tecla para el juego. Ctrl izquierdo no lo activa.
+Los nombres propios de personajes/cuentas y archivos no se traducen.</p>
+<p>WvW oculta nombres, cuentas y guilds enemigos: se muestra el rango disponible en el log.
+El dano incluye condiciones y mascotas/clones. Los strips cuentan retiradas completas de boons,
+incluido el formato actual de arcdps (statechange 72).</p>
+
+<h2>Requisitos e instalacion</h2>
+<p><a href="https://raidcore.gg/Nexus">Nexus</a> y
+<a href="https://www.deltaconnected.com/arcdps/">arcdps</a> con logs WvW activados.
+Extension de healing para aportar sus datos. WvW Fight Analysis es opcional:
+su evento EV_LOG_PARSED acelera la deteccion; como respaldo se vigilan los logs cada 3 s.
+Parser EVTC y ZIP propios, sin nuevas dependencias de terceros.</p>
+<p>La carpeta se obtiene de boss_encounter_path en arcdps.ini o de
+<code>Documentos\Guild Wars 2\addons\arcdps\arcdps.cbtlogs</code>, incluidas subcarpetas.</p>
+<p>Descargar <a href="https://github.com/cbart-cmd/gw2addonsreleases/releases/download/fight-analysis-danger-v0.2.17/fight_analysis_danger.dll">fight_analysis_danger.dll v0.2.17</a>,
+cerrar GW2 y copiarla a <code>addons</code> del juego. No usar el enlace latest del
+repositorio compartido, que tambien distribuye Timers.</p>
+<p>Verificacion de la DLL publicada (1.142.272 bytes):</p>
+<pre>Get-FileHash .\fight_analysis_danger.dll -Algorithm SHA256</pre>
+<p>SHA-256: <code>5c566a574b9dff2e17b03813ca3de726560741d657ac03be63db5e2ac9deadde</code>.
+No corresponde necesariamente a una recompilacion local. MD5 se conserva para
+Nexus, pero no es una firma de autenticidad.</p>
+<p>Si compilas, la DLL queda en <code>target\release\fight_analysis_danger.dll</code>;
+puedes instalarla con:</p>
+<pre>.\install.ps1
+.\install.ps1 -Build   # tests, compilacion e instalacion</pre>
+<p>Tambien sirve install.bat. Cargar <strong>WvW Combat Insights</strong> en Nexus (Ctrl+O).
+No dejar otra copia con nombre distinto.</p>
+<p>Se mantiene la autoactualizacion de
+<a href="https://github.com/cbart-cmd/gw2addonsreleases">gw2addonsreleases</a> con DLL y MD5,
+excluyendo esta DLL de Git LFS y publicando ambos archivos como assets de release.
+Si una instalacion antigua fue reemplazada por un puntero LFS de unos 130 bytes,
+cerrar GW2 y sustituir manualmente solo la DLL por el binario verificado, sin borrar ajustes.</p>
+<h2>Desarrollo</h2>
+<p>Windows x64, Rust estable con rustfmt, Visual Studio Build Tools (Desktop development
+with C++) y Windows SDK. No requiere repositorios hermanos. Los generadores de datos
+son opcionales y necesitan acceso a Internet.</p>
+<pre>cargo fmt --all -- --check
+cargo test --locked --all-targets
+cargo build --locked --release
+python tools\collect_licenses.py --test
+python tools\collect_licenses.py --check
+cargo run --release --example analyze -- [ruta\log.zevtc] [top] [es|en|fr|de]
+python tools\update_game_names.py</pre>
+<p><code>python tools\update_weapon_data.py</code> regenera el catalogo de habilidades y los iconos oficiales.</p>
+<p>CI Windows comprueba formato, tests, licencias y build release. Los artefactos incluyen
+DLL, MD5/SHA-256, licencias y codigo fuente del mismo commit. Permisos de solo lectura;
+no publica actualizaciones automaticamente.</p>
+<h2>Soporte, privacidad y licencia</h2>
+<p>En los reportes incluye versiones, pasos y si el fallo afecta al directo o a logs.
+No publiques cuentas, personajes, rutas personales ni logs sin anonimizar. Comprimir
+un log no lo anonimiza; recorta capturas y usa ejemplos sinteticos.
+Consulta <a href="CONTRIBUTING.md">CONTRIBUTING.md</a> y comunica vulnerabilidades
+privadamente siguiendo <a href="SECURITY.md">SECURITY.md</a>.</p>
+<p>Codigo propio bajo GNU GPL version 3 o posterior, sin garantia:
+<a href="LICENSE">LICENSE</a>, con <a href="ADDITIONAL-PERMISSION.md">permiso limitado de integracion</a>.
+Recursos de Guild Wars 2 y dependencias conservan sus
+condiciones originales y no se relicencian bajo GPL.
+<a href="THIRD-PARTY-NOTICES.md">Atribuciones</a> y
+<a href="THIRD-PARTY-LICENSES.txt">textos de licencias de terceros</a>.
+Proyecto comunitario no oficial, sin afiliacion, patrocinio ni aprobacion de ArenaNet o NCSOFT.</p>
+</body>
+</html>

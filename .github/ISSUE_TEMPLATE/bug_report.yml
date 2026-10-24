@@ -1,0 +1,36 @@
+name: Bug report
+description: Report an addon problem without sharing private player data.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not upload unredacted logs, account names, private paths or credentials.
+        Report security issues privately using the Security tab, not this form.
+  - type: input
+    id: versions
+    attributes:
+      label: Addon, Nexus and arcdps versions
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Affected report
+      options:
+        - Live provisional
+        - Saved EVTC / ZIP
+        - Both
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include expected and actual behavior. Use synthetic examples where possible.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context or redacted screenshots
