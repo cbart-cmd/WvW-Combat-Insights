@@ -264,7 +264,8 @@ python tools\update_game_names.py</pre>
 <p><code>tools\publish.ps1 -Bump patch</code> hace la publicacion completa: formato, tests y build release,
 <code>GetAddonDef</code>, DLL y MD5 en el repo de distribucion con la comprobacion de .gitattributes y del blob
 preparado, push en ambos repos, release con <code>--latest=false</code>, dejar solo las dos releases de este addon
-y verificar las cuatro URL y los dos sidecars. <code>tools\verify-release.ps1</code> solo comprueba lo publicado.
+y verificar las cuatro URL y los dos sidecars. Commitea con el email noreply de GitHub y muestra el repositorio
+de origen antes de empujar. <code>tools\verify-release.ps1</code> solo comprueba lo publicado.
 Ninguno copia la DLL al juego.</p>
 <p><code>elitei\</code> guarda copias de referencia del codigo de Elite Insights con las reglas de calculo
 comparadas (<code>elitei\fetch-ei.ps1</code> las vuelve a descargar).</p>

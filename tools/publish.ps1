@@ -44,7 +44,9 @@ param(
     [switch] $VerifyOnly,
     [switch] $NoPush,
     [string] $DistPath,
-    [int] $WaitSeconds = 360
+    [int] $WaitSeconds = 360,
+    [string] $GitName,
+    [string] $GitEmail
 )
 
 $ErrorActionPreference = 'Stop'
@@ -111,6 +113,37 @@ function Get-Md5([byte[]] $bytes) {
     try { ([BitConverter]::ToString($md5.ComputeHash($bytes))).Replace('-', '').ToLower() } finally { $md5.Dispose() }
 }
 
+function Get-Slug($url) {
+    $url = $url -replace '^git@github\.com:', '' -replace '^https://github\.com/', '' -replace '^https?://[^/]+/', '' -replace '\.git$', ''
+    if ($url -notmatch '^[^/]+/[^/]+$') { Fail "remoto no reconocido como github.com/<owner>/<repo>: $url" }
+    $url.Trim()
+}
+
+# Nombre y email de los commits: por defecto el login de gh y el email noreply de
+# GitHub, para no publicar la direccion real ni depender de git config.
+function Resolve-Identity {
+    $login = try { gh api user --jq .login } catch { $null }
+    if (-not $GitName) { $script:GitName = if ($login) { $login } else { 'cbart-cmd' } }
+    if (-not $GitEmail) {
+        $configured = git -C $Root config user.email
+        $script:GitEmail = if ($configured -like '*@users.noreply.github.com') {
+            $configured
+        } elseif ($login) {
+            "$login@users.noreply.github.com"
+        } else {
+            Fail 'no hay email de commit; pasa -GitEmail <usuario@users.noreply.github.com>'
+        }
+    }
+    if ($script:GitEmail -notlike '*@users.noreply.github.com') {
+        Warn "el email $($script:GitEmail) no es de GitHub y quedara visible en el repositorio publico"
+    }
+}
+
+function Commit($repo, $message) {
+    git -C $repo -c user.name=$script:GitName -c user.email=$script:GitEmail commit -q -m $message
+    if ($LASTEXITCODE) { Fail "git commit ($repo)" }
+}
+
 # --- DLL real y su GetAddonDef -------------------------------------------------
 $probeSource = @'
 using System;
@@ -163,8 +196,7 @@ function Test-Dll($path, $addon, $version) {
 }
 
 function Get-DistSlug {
-    $url = (git -C $DistPath remote get-url origin) -replace '^git@github\.com:', '' -replace '^https://github\.com/', '' -replace '\.git$', ''
-    $url.Trim()
+    Get-Slug (git -C $DistPath remote get-url origin)
 }
 
 # --- Verificacion de lo publicado ---------------------------------------------
@@ -232,6 +264,8 @@ $addon = Read-Addon
 $dllName = "$($addon.DataDir).dll"
 $tagPrefix = $addon.DataDir.Replace('_', '-')
 $version = Read-Version
+$sourceSlug = Get-Slug (git -C $Root remote get-url origin)
+Resolve-Identity
 
 if (-not $VerifyOnly) {
     if ($Bump -ne 'none') {
@@ -241,6 +275,8 @@ if (-not $VerifyOnly) {
     } else {
         Step "Publicando v$version (sin bump)"
     }
+    Ok "fuente: github.com/$sourceSlug"
+    Ok "commits: $GitName <$GitEmail>"
     if ((git -C $Root status --porcelain) -and $Bump -eq 'none') {
         Warn "hay cambios sin commitear; se incluyen solo los archivos ya versionados"
     }
@@ -299,8 +335,7 @@ if (-not $VerifyOnly) {
             if (-not $LASTEXITCODE) {
                 Ok 'fuente: sin cambios que commitear'
             } else {
-                git commit -q -m "v$version`: publicar $($addon.Name)"
-                if ($LASTEXITCODE) { Fail 'git commit (fuente)' }
+                Commit $Root "v$version`: publicar $($addon.Name)"
                 Ok "fuente: $(git rev-parse --short HEAD)"
             }
             git push origin HEAD; if ($LASTEXITCODE) { Fail 'git push (fuente)' }
@@ -312,8 +347,7 @@ if (-not $VerifyOnly) {
         git -C $DistPath add $dllName "$dllName.md5"
         git -C $DistPath diff --cached --quiet
         if ($LASTEXITCODE) {
-            git -C $DistPath commit -q -m "v$version`: publicar $($addon.Name)"
-            if ($LASTEXITCODE) { Fail 'git commit (distribucion)' }
+            Commit $DistPath "v$version`: publicar $($addon.Name)"
             Ok "distribucion: $(git -C $DistPath rev-parse --short HEAD)"
         } else {
             Ok 'distribucion: sin cambios que commitear'

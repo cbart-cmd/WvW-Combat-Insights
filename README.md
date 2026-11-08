@@ -334,6 +334,8 @@ python tools\update_weapon_data.py   # catalogo de habilidades e iconos oficiale
 `tools\publish.ps1` exige `.gitattributes` con la excepcion de la DLL, comprueba que el blob
 preparado sea la DLL real, crea la release con `--latest=false`, deja solo las dos releases mas
 recientes de este addon y verifica las cuatro URL de descarga y los dos sidecars.
+Commitea con el email noreply de GitHub (`-GitName`/`-GitEmail` para cambiarlo) y muestra el
+repositorio de origen antes de empujar, para no publicar por error en otro sitio.
 Las copias de referencia de Elite Insights usadas para fijar reglas estan en `elitei\`
 (`elitei\fetch-ei.ps1` las vuelve a descargar). Ninguno de estos scripts copia la DLL al juego.
 

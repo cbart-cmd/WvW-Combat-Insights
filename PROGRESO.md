@@ -4,6 +4,7 @@
 - Desde v0.2.21 el desarrollo se estaba subiendo solo al repositorio privado `Fight-Analysis-Danger` y este repositorio publico se quedo en v0.2.20.
 - Este commit unifica el estado actual (v0.2.29) sobre la historia publica existente, conservando `LICENSE`, CI, plantillas de issues, `CONTRIBUTING`, `SECURITY`, `CHANGELOG` y los avisos de terceros que solo existian aqui.
 - A partir de ahora el desarrollo y las publicaciones se hacen desde este repositorio; `Fight-Analysis-Danger` queda como copia privada de respaldo y `gw2addonsreleases` sigue siendo el repo de distribucion de la DLL.
+- `tools/publish.ps1` fija la identidad de los commits con el email noreply de GitHub (`-GitName`/`-GitEmail` para cambiarla), avisa si no es noreply y muestra el repositorio de origen antes de empujar, para no publicar por error en otro sitio.
 
 ## v0.2.29: fondo del color de clase en Destacados y Healing
 - Nueva opcion `class_colors` (activada por defecto) en **Estilo** del menu contextual de Destacados y Healing, tambien en ventanas adicionales. Activa, cada fila pinta un fondo casi opaco con el color de la profesion, como arcdps, y el nombre y las cifras pasan a blanco o casi negro segun el contraste (luminancia > 0.6 usa texto oscuro).
