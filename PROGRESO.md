@@ -1,5 +1,9 @@
 # Progreso: fight_analysis_danger
 
+## v0.2.30: icono de especializacion en Healing
+- La ventana de Healing usaba el icono de la profesion base (`profession_icon`), asi que una especializacion de elite aparecia con el icono core. Ahora usa el mismo icono de especializacion que Destacados y cae al de la clase solo cuando la elite no se conoce.
+- Se elimina el parametro `profession_only` de `player_row` y la funcion `profession_icon`, que ya no tenian uso.
+
 ## Unificacion del repositorio publico (v0.2.29)
 - Desde v0.2.21 el desarrollo se estaba subiendo solo al repositorio privado `Fight-Analysis-Danger` y este repositorio publico se quedo en v0.2.20.
 - Este commit unifica el estado actual (v0.2.29) sobre la historia publica existente, conservando `LICENSE`, CI, plantillas de issues, `CONTRIBUTING`, `SECURITY`, `CHANGELOG` y los avisos de terceros que solo existian aqui.

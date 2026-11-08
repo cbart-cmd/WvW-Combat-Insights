@@ -105,9 +105,9 @@ si tiene apertura automatica, volvera a abrirse al terminar un combate valido.
 ### Healing
 
 - Tooltip de jugador compacto: conserva las cifras de limpias, sin la explicacion larga de retiradas al escuadron.
-- Ranking de miembros identificados del grupo/escuadron, con **icono de clase** delante del nombre.
+- Ranking de miembros identificados del grupo/escuadron, con **icono de especializacion** delante del nombre (el de la clase si no se conoce la elite).
 - **Sin recorte de filas**: muestra todos los jugadores con datos disponibles, con scroll al superar el alto de la ventana; no se anaden filas ficticias.
-- **Una sola linea por jugador**: icono de clase, nombre y columnas de **curas, barrera y limpias**, las tres por defecto.
+- **Una sola linea por jugador**: icono de especializacion, nombre y columnas de **curas, barrera y limpias**, las tres por defecto.
   **Estadisticas → Columnas** y las opciones permiten combinarlas o anadir el total de curas + barrera. Sin barras ni bordes.
 - Orden inicial por **curas + barreras**. El menu de estadisticas conserva el selector de orden;
   clicar una cabecera numerica ordena por ella y repetir el clic invierte el orden.

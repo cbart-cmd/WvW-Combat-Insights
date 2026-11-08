@@ -1175,7 +1175,6 @@ fn highlights(
             ui,
             p,
             index,
-            false,
             config.class_colors,
             &cache.values[position],
             &columns,
@@ -1216,7 +1215,6 @@ fn player_row(
     ui: &Ui,
     player: &Player,
     index: usize,
-    profession_only: bool,
     class_colors: bool,
     values: &[String],
     columns: &[MetricColumn],
@@ -1242,12 +1240,8 @@ fn player_row(
     }
     let name_left = height + 3.0;
     let name_width = (width - name_left - value_width - 5.0).max(0.0);
-    let elite = if profession_only { 0 } else { player.elite };
-    let bytes = if profession_only {
-        crate::evtc::profession_icon(player.profession)
-    } else {
-        player.specialization_icon()
-    };
+    let elite = player.elite;
+    let bytes = player.specialization_icon();
     if let Some(bytes) = bytes
         && let Some(texture) = texture_id(
             format!("FIGHT_ANALYSIS_DANGER_SPEC_{}_{}", player.profession, elite),
@@ -1444,7 +1438,6 @@ fn healing(
             ui,
             p,
             index,
-            true,
             class_colors,
             values,
             &columns,

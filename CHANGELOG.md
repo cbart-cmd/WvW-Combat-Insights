@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.30
+
+- Healing rows use the elite specialization icon, like Highlights, instead of the
+  core profession icon; it falls back to the profession icon when the elite is unknown.
+
 ## 0.2.29
 
 - Class-color row background in Highlights and Healing (on by default): each row is

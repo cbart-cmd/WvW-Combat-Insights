@@ -900,10 +900,6 @@ pub fn profession_color(profession: u32) -> [f32; 4] {
     }
 }
 
-pub fn profession_icon(profession: u32) -> Option<&'static [u8]> {
-    specialization_icons::icon(profession, 0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

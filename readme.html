@@ -46,7 +46,7 @@ Cerrar una no cierra las otras; la apertura automatica puede volver a mostrarla 
 <tbody>
 <tr><td>Resumen</td><td>Tres colores, jugadores, kills, dano total, corrups totales y down c por equipo. Corrups cuenta retiradas de boons (strips), como Destacados. Down c suma el Down contribution de los jugadores del color; cabecera con ayuda del nombre completo y total sin abreviar en el tooltip del equipo. Tu equipo primero, sin asterisco. Celdas de la altura exacta del texto.</td><td>259 px</td></tr>
 <tr><td>Jugadores destacados</td><td>Pestanas de colores presentes en el combate. Icono de especializacion, nombre, dano, corrups y Down contribution por defecto; columnas configurables. Armas en texto.</td><td>300 px</td></tr>
-<tr><td>Healing</td><td>Una linea por jugador: icono de clase, nombre, curas, barrera y limpias por defecto. Columnas configurables, sin barras ni bordes.</td><td>234 px, todas las filas disponibles con scroll</td></tr>
+<tr><td>Healing</td><td>Una linea por jugador: icono de especializacion (el de la clase si no se conoce la elite), nombre, curas, barrera y limpias por defecto. Columnas configurables, sin barras ni bordes.</td><td>234 px, todas las filas disponibles con scroll</td></tr>
 </tbody>
 </table>
 <p>Clicar un color o sus kills en Resumen activa y muestra Destacados con ese equipo y combate.
@@ -60,7 +60,7 @@ Orden inicial por <strong>dano total + corrups × 2000 + Down contribution</stro
 Ranking y cifras en cache; las filas fuera de la vista no generan textos, iconos ni tooltips de jugador (tambien en Healing); los tooltips solo se construyen para la fila bajo el raton.
 Las armas aparecen como texto discreto traducido, por ejemplo Lanza · Mandoble, en una linea de la altura del texto.
 Se recorta con puntos suspensivos cuando no cabe y el tooltip conserva todos los nombres.
-El uso subacuatico identificado se marca en azul. Se mantienen los iconos de clase/especializacion.
+El uso subacuatico identificado se marca en azul. Healing usa el mismo icono de especializacion que Destacados.
 <strong>Clic derecho → Mostrar armas</strong>, activado por defecto, permite ocultar toda la segunda linea
 sin dejar espacio vacio. Comparte el ajuste guardado de la pestana Destacados de Nexus,
 tambien para ventanas adicionales; se respeta una preferencia ya guardada.
