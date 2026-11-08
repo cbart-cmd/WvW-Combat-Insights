@@ -38,9 +38,11 @@ impl Report {
     pub(crate) fn replaces(&self, provisional: &Report) -> bool {
         self.live.is_none()
             && provisional.live.as_ref().is_some_and(|live| live.finished)
+            // El directo empieza en la primera interaccion y puede seguir recibiendo
+            // eventos despues de que arcdps cierre el log: basta con que se solapen.
             && matches!(
                 (self.fight.event_range, provisional.fight.event_range),
-                (Some((first, last)), Some((start, end))) if first <= start && last >= end
+                (Some((first, last)), Some((start, end))) if first <= end && start <= last
             )
     }
 }
@@ -149,6 +151,27 @@ mod tests {
         assert_eq!(state.history[0].path, PathBuf::from("live-3"));
         assert_eq!(state.history[1].path, real.path);
     }
+
+    #[test]
+    fn overlapping_log_replaces_provisional_that_starts_late_or_ends_later() {
+        // Directo que empieza 42 s despues y sigue unos eventos tras cerrar el log.
+        let late = report("live-6", (43_000, 113_500), true);
+        assert!(report("real.zevtc", (1_000, 112_000), false).replaces(&late));
+        // Otro combate posterior se conserva.
+        assert!(!report("later.zevtc", (120_000, 130_000), false).replaces(&late));
+    }
+
+    #[test]
+    fn startup_enables_follow_latest_even_when_saved_off() {
+        let mut settings = Settings::default();
+        for window in &mut settings.windows {
+            window.follow_latest = false;
+        }
+
+        assert!(enable_follow_latest(&mut settings));
+        assert!(settings.windows.iter().all(|window| window.follow_latest));
+        assert!(!enable_follow_latest(&mut settings));
+    }
 }
 
 static STATE: LazyLock<Mutex<State>> = LazyLock::new(|| {
@@ -189,6 +212,17 @@ fn send(msg: Msg) {
     }
 }
 
+fn enable_follow_latest(settings: &mut Settings) -> bool {
+    let mut changed = false;
+    for window in &mut settings.windows {
+        if !window.follow_latest {
+            window.follow_latest = true;
+            changed = true;
+        }
+    }
+    changed
+}
+
 pub fn log_parsed(file_name: String) {
     send(Msg::Parsed(file_name));
 }
@@ -207,6 +241,12 @@ pub fn reanalyze() {
 
 /// Arranca el hilo de analisis. `arcdps_ini`: ruta de `arcdps.ini` para encontrar la carpeta de logs.
 pub fn start(arcdps_ini: Option<PathBuf>) {
+    {
+        let mut st = state();
+        if enable_follow_latest(&mut st.settings) {
+            st.settings.save();
+        }
+    }
     let (tx, rx) = mpsc::channel();
     *SENDER.lock().unwrap_or_else(|e| e.into_inner()) = Some(tx);
     let handle = std::thread::spawn(move || {
@@ -234,7 +274,8 @@ pub fn start(arcdps_ini: Option<PathBuf>) {
         loop {
             let msg = rx.recv_timeout(crate::live::REFRESH);
             let vs_players_only = state().settings.vs_players_only;
-            crate::live::refresh(vs_players_only);
+            let inactive_timeout = logs::wvw_inactive_timeout(arcdps_ini.as_deref());
+            crate::live::refresh(vs_players_only, inactive_timeout);
             let dir = {
                 let mut st = state();
                 st.log_dir = logs::log_dir(&st.settings.log_dir, arcdps_ini.clone());

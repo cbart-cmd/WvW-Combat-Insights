@@ -2,8 +2,10 @@
 
 use std::{
     path::{Path, PathBuf},
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
+
+const DEFAULT_WVW_INACTIVE_SECS: u64 = 15;
 
 /// Carpeta de logs: la elegida por el usuario, la `boss_encounter_path` de `arcdps.ini` o la de por defecto.
 pub fn log_dir(custom: &str, arcdps_ini: Option<PathBuf>) -> Option<PathBuf> {
@@ -24,6 +26,15 @@ pub fn log_dir(custom: &str, arcdps_ini: Option<PathBuf>) -> Option<PathBuf> {
     })
 }
 
+/// Tiempo de inactividad configurado por arcdps para cerrar los combates WvW.
+pub fn wvw_inactive_timeout(arcdps_ini: Option<&Path>) -> Duration {
+    arcdps_ini
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|ini| ini_wvw_inactive_secs(&ini))
+        .map(Duration::from_secs)
+        .unwrap_or_else(|| Duration::from_secs(DEFAULT_WVW_INACTIVE_SECS))
+}
+
 /// `boss_encounter_path` de la seccion `[session]` de `arcdps.ini`.
 fn ini_log_path(ini: &str) -> Option<PathBuf> {
     let mut in_session = false;
@@ -37,6 +48,22 @@ fn ini_log_path(ini: &str) -> Option<PathBuf> {
             && !value.trim().is_empty()
         {
             return Some(PathBuf::from(value.trim()));
+        }
+    }
+    None
+}
+
+fn ini_wvw_inactive_secs(ini: &str) -> Option<u64> {
+    let mut in_session = false;
+    for line in ini.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_session = line.eq_ignore_ascii_case("[session]");
+        } else if in_session
+            && let Some((key, value)) = line.split_once('=')
+            && key.trim().eq_ignore_ascii_case("wvwinactive")
+        {
+            return value.trim().parse().ok();
         }
     }
     None
@@ -138,5 +165,22 @@ mod tests {
             "[other]\nboss_encounter_path=X\n[session]\nfoo=1\nboss_encounter_path=D:\\logs\\\n";
         assert_eq!(ini_log_path(ini), Some(PathBuf::from("D:\\logs\\")));
         assert_eq!(ini_log_path("[session]\nboss_encounter_path=\n"), None);
+    }
+
+    #[test]
+    fn reads_wvw_inactivity_from_session_and_defaults_to_fifteen_seconds() {
+        assert_eq!(
+            ini_wvw_inactive_secs("[other]\nwvwinactive=3\n[session]\nwvwinactive=27\n"),
+            Some(27)
+        );
+        assert_eq!(
+            ini_wvw_inactive_secs("[session]\nwvwinactive=invalid\n"),
+            None
+        );
+        assert_eq!(ini_wvw_inactive_secs("[session]\nwvwinactive=0\n"), Some(0));
+        assert_eq!(
+            wvw_inactive_timeout(None),
+            Duration::from_secs(DEFAULT_WVW_INACTIVE_SECS)
+        );
     }
 }

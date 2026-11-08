@@ -1,10 +1,8 @@
 [package]
 name = "fight_analysis_danger"
-version = "0.2.20"
+version = "0.2.29"
 edition = "2024"
 description = "WvW Combat Insights: team summary, player highlights and squad healing for Nexus"
-license = "GPL-3.0-or-later"
-repository = "https://github.com/cbart-cmd/WvW-Combat-Insights"
 build = "nexusbase/build.rs"
 
 [build-dependencies]
@@ -29,3 +27,4 @@ crate-type = ["cdylib", "rlib"] # cdylib: DLL de Nexus; rlib: para el ejemplo de
 [profile.release]
 lto = true
 opt-level = 2
+codegen-units = 1

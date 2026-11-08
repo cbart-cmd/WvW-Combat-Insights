@@ -22,9 +22,18 @@ El directo arranca con PvP del equipo propio mientras el POV esta en combate, au
 y se refresca aproximadamente cada segundo sin el umbral de autoapertura de los logs.
 Healing ya no recorta el ranking/copia a 4–10 filas; esto no altera sus formulas ni cobertura.
 
+Desde **v0.2.28** hay dos cambios de calculo, aplicados tanto a logs como al directo:
+
+- **Curas y barrera** siguen la regla de Elite Insights: se suma todo evento de la extension
+  cuyo byte IFF marque objetivo aliado, sin exigir escuadron, subgrupo ni POV identificable.
+  Antes se perdian las curas a aliados fuera del escuadron y, sin grupo identificable, no se
+  mostraba nada; se elimino ese estado de cobertura.
+- El **dano absorbido por barrera** (`is_shields`) deja de sumar en dano, dano directo,
+  condiciones y Down contribution, como el `HealthDamage` de Elite Insights.
+
 Referencias fijadas para que la comparacion sea reproducible:
 
-- Base auditada: v0.2.9 (anterior al snapshot publico);
+- Base auditada: v0.2.9, commit `9eb411bde5c0c398ddac52363d6d1b6b044e6187`;
   implementacion actual de contribucion: v0.2.10, [modulo local](src/contribution.rs).
 - AxiBridge: commit `44d58c555ffb3c4d9adae3522f8472985b9fc51c`, rama main.
 - Parser nativo usado por esa revision: `@axiapps/axilog` 1.16.0,
@@ -98,17 +107,17 @@ Fuentes: [nuestro parser](src/evtc.rs), [lectores de AxiBridge][ab-dashboard],
 | Corrups totales por color, Resumen | Suma del mismo contador de corrups de las filas del color | Agregacion de `boonStrips` sobre la poblacion seleccionada | Misma operacion; no el mismo total garantizado |
 | Down c total por color, Resumen | Suma del Down contribution local de los jugadores del color | Agregacion de contribucion sobre su poblacion | Misma suma y metodologia; poblacion distinta |
 | Kills causadas, Resumen y tooltip | Resultado 8 contra jugador de otro color; credito al atacante/propietario | Resultado killing blow contra `enemies`; credito temporal al propietario, identidades agrupadas | Misma senal base; destinos y guardas distintos |
-| Muertes sufridas, tooltip de equipo | Resultado 8 recibido por un jugador | `CHANGE_DEAD` del actor en el contador nativo de muertes | Diferente |
-| Downs sufridos, tooltip de equipo | Resultado 9 recibido, `buff=0` | `defenses[0].downCount`, resultado downed recibido en la ruta nativa | Misma senal base; guardas e identidades distintas |
+| Muertes sufridas, tooltip de equipo | Cambio de estado `CHANGE_DEAD` del jugador | `CHANGE_DEAD` del actor en el contador nativo de muertes | Misma senal base; guardas e identidades distintas |
+| Downs sufridos, tooltip de equipo | Cambio de estado `CHANGE_DOWN` del jugador | `defenses[0].downCount`, resultado downed recibido en la ruta nativa | Base distinta: estado frente a resultado de dano |
 | Jugadores registrados por color | Cuenta agentes jugadores con color, deduplicados por direccion | Roster agrupado por cuenta o instancia segun identidad; filtros de escuadron/participacion segun vista | Diferente |
-| Curas, Healing | Importes observados de extension hacia miembros del escuadron, incluidos receptores mascota resolubles a su propietario | `computeSquadHealing`: suma de `outgoingHealingAllies`, matriz de destinatarios jugadores | Misma fuente; alcance y sanitizacion diferentes |
-| Barrera, Healing | Importes de extension marcados como barrera, con el mismo alcance local | `computeSquadBarrier`: suma de `outgoingBarrierAllies` | Misma fuente; alcance y sanitizacion diferentes |
+| Curas, Healing | Desde v0.2.28, importes de extension hacia **cualquier objetivo aliado** (byte IFF amigo), incluidas propias, mascotas y aliados fuera de escuadron; regla de Elite Insights | `computeSquadHealing`: suma de `outgoingHealingAllies`, matriz de destinatarios jugadores | Misma regla que Elite Insights; AxiBridge usa alcance de escuadron |
+| Barrera, Healing | Importes de extension marcados como barrera, con el mismo alcance local (IFF amigo) | `computeSquadBarrier`: suma de `outgoingBarrierAllies` | Misma fuente; alcance y sanitizacion diferentes |
 | Total de Healing | Curas + barrera disponibles; si falta una, suma parcial identificada como limite inferior | Existen los dos componentes; no se ha acreditado un equivalente unico con nuestra semantica de ausencia | Combinacion local; componentes no equivalentes garantizados |
 | Limpias, Healing | Una por condicion retirada completamente; escuadron al tiempo del evento, propias y mascotas conocidas | Predeterminado arcdps: suma de tres contadores nativos, con exclusiones especificas | Diferente |
 | Aportacion por segundo, tooltip Healing | Metrica seleccionada / duracion local del combate | HPS/BPS del parser usan duracion nativa; agregaciones de varios logs pueden usar tiempo activo | Misma division basica; denominador/superficie distintos |
 | Duracion del combate | Ultimo menos primer tiempo de eventos ordinarios `NONE` | Duracion del encounter nativo desde inicio del log hasta ultimo evento | Diferente |
 | Puntuacion inicial oculta de Destacados | Dano + 2000 * corrups + Down contribution | No se ha identificado esa formula como metrica equivalente de AxiBridge | Propia, solicitada para este addon |
-| Cobertura / ausencia en Healing | Parcial, ausente, incompatible o grupo no identificable; `-` no es 0 | Disponibilidad de extension y `hasHealAddon`; helpers devuelven 0 cuando faltan arrays | Semantica de disponibilidad distinta |
+| Cobertura / ausencia en Healing | Parcial, ausente o incompatible; `-` no es 0 | Disponibilidad de extension y `hasHealAddon`; helpers devuelven 0 cuando faltan arrays | Semantica de disponibilidad distinta |
 
 No confundir **downs sufridos** con **downs causados**: nuestro tooltip de equipo
 expone los primeros. AxiBridge tambien dispone de `statsTargets[*][0].downed`
@@ -122,6 +131,8 @@ En [nuestro parser](src/evtc.rs):
 
 - Golpe: `buff=0`, resultado en `0,1,2,5,8,9`, `value>0`.
 - Condicion: `buff=1`, resultado `0` o `14..18`, `buff_dmg>0`.
+- Dano absorbido por barrera (`is_shields != 0`) excluido desde v0.2.28, como
+  `HealthDamage` de Elite Insights: no es dano a la salud.
 - Sin activacion ni retirada de buff en la rama de dano.
 - Actor con equipo reconocido. Con filtro inicial, destino jugador con equipo
   reconocido y distinto. Incluye por ello enfrentamientos entre los otros dos
@@ -195,6 +206,8 @@ Algoritmo de [AxiLog 1.16.0][ax-contribution]:
 No es "los ultimos 2 segundos": esos 2 s preceden al ancla de salud, no al down.
 Se admiten los eventos ordinarios sin activacion/retirada, salvo CC (12) y
 breakbar (10), con `max(buff_dmg,0)` para buff=1 y `max(value,0)` en otro caso.
+Desde v0.2.28 tambien se excluye el dano absorbido por barrera (`is_shields`),
+que no reduce salud, igual que el `HealthDamage` de Elite Insights.
 Se incluyen todos los eventos admisibles del milisegundo del down, independientemente
 de su posicion respecto a una notificacion de estado. Sin ancla se usa el primer
 evento del log; salud >200 % se ignora y salud 100-200 % equivale al clamp a 100 %.
@@ -252,21 +265,23 @@ normal sin comprobar la ruta seleccionada.
 ### 5. Kills, muertes y derribos sufridos
 
 Nuestro conteo de kills usa el resultado 8 contra un jugador de otro color,
-con credito de mascota conocido. No exige importe positivo. El conteo de
-muertes suma ese resultado en la victima, y los downs sufridos usan el resultado
-9; ambos con `buff=0`.
+con credito de mascota conocido. No exige importe positivo. Las muertes y los
+downs sufridos se cuentan desde los cambios de estado `CHANGE_DEAD` y
+`CHANGE_DOWN`, incluidos los jugadores fuera del escuadron y las muertes sin
+killing blow visible; el instid resuelve los agentes fuera de rango.
 
 [AxiLog][ax-downs] usa killing blow/downed para las acciones causadas contra
 `enemies`, con resolucion temporal del master y agrupacion de cuentas. Sus
-muertes sufridas provienen de **`CHANGE_DEAD`**, no de un killing blow recibido.
-Sus downs sufridos usan el resultado downed recibido; las guardas no son
-identicas a las nuestras.
+muertes sufridas provienen de **`CHANGE_DEAD`**, igual que las nuestras. Sus
+downs sufridos usan el resultado downed recibido; las guardas no son identicas
+a las nuestras.
 
-Consecuencia: una muerte con cambio de estado registrado pero sin killing blow
-recibido puede contar alli y no aqui. Nuestros downs del tooltip son eventos
-sufridos, no enemigos derribados por ese equipo. Tampoco se deduce que el numero
-de kills de un color deba igualar el de muertes de otro en un combate a tres
-bandos con visibilidad parcial.
+Consecuencia: con los cambios de estado, el tooltip de equipo coincide con
+Elite Insights en muertes y downs (`Dead`, `Downs`) y las kills con su columna
+`Killed`. Nuestros downs del tooltip son eventos sufridos, no enemigos
+derribados por ese equipo. Tampoco se deduce que el numero de kills de un color
+deba igualar el de muertes de otro en un combate a tres bandos con visibilidad
+parcial.
 
 ### 6. Curas, barrera, total y disponibilidad
 
@@ -274,12 +289,14 @@ En [nuestro modulo de healing](src/healing.rs) y [la UI](src/ui.rs):
 
 - Extension de Healing Stats, firma `0x9c9b3c99`, revisiones 1/2.
 - Importes observados de curas y barrera; **no curacion efectiva demostrada**.
-- Emisor y receptor, o su propietario conocido, deben pertenecer al escuadron
-  del POV en ese momento: cuenta identificable, subgrupo 1-15 y sin color
-  conocido distinto al del POV.
-- Un receptor mascota puede resolverse a su propietario y contar. Los cambios
-  de subgrupo se aplican al recorrer eventos; la lista mostrada usa pertenencia
-  final.
+- Desde v0.2.28, regla de Elite Insights: cuenta todo evento de la extension cuyo
+  byte IFF marque objetivo aliado (0 = amigo). No exige escuadron, subgrupo ni POV
+  identificable, e incluye al propio jugador, mascotas y aliados fuera del escuadron.
+  Antes se exigia escuadron registrado en emisor y receptor y se descartaba el
+  resto; sin grupo identificable no se mostraba nada.
+- Un receptor mascota se resuelve a su propietario por instancia/master y cuenta
+  a quien cura. La lista mostrada sigue siendo la del escuadron registrado. Las
+  limpias conservan su propia exigencia de escuadron al tiempo del evento.
 - Se prefieren observaciones source-peer por jugador atribuido, instancia
   emisora y tipo cura/barrera; despues se eliminan duplicados de campos exactos.
 - Datos de curas/barrera ausentes se muestran como `-`. Si solo se conoce un
@@ -290,6 +307,9 @@ En [nuestro modulo de healing](src/healing.rs) y [la UI](src/ui.rs):
 source-peer y atribuye mascotas, pero sanitiza por **healer real antes de
 atribuir al master**, con identidad temporal. Conserva la identidad del
 destinatario, en vez de plegar automaticamente mascotas receptoras al master.
+La referencia para nuestra columna es ahora **Elite Insights** (`ToFriendly` =
+`IFF.Friend`, mascotas incluidas, ver `elitei/`), no el alcance de escuadron de
+AxiBridge.
 
 Los helpers [computeSquadHealing / computeSquadBarrier][ab-combat] suman los
 arrays por destinatario `outgoingHealingAllies` / `outgoingBarrierAllies`. En el
@@ -381,7 +401,9 @@ Mantenerla o cambiarla es una decision de producto separada de alinear metricas.
 ## Estado de adaptacion y pasos pendientes
 
 Aplicado en v0.2.10: algoritmo de Down contribution y eliminacion del ajuste fijo.
-Las demas metricas permanecen pendientes de decision y verificacion.
+Aplicado en v0.2.28: curas/barrera con el alcance de Elite Insights y exclusion del
+dano a barrera en Dano y Down contribution. Las demas metricas permanecen pendientes
+de decision y verificacion.
 
 1. **Fijar el contrato:** AxiBridge nativo con AxiLog 1.16.0 como referencia
    inicial, distinguiendo informes importados. Elegir explicitamente si Dano
@@ -397,10 +419,13 @@ Las demas metricas permanecen pendientes de decision y verificacion.
 5. **Corrups y limpias:** seleccionar `boonStrips` count y cleanse arcdps, o
    identificar expresamente otra variante. No mezclar boonStrips de tipo EI con
    los contadores `strips_arcdps` creyendo que son lo mismo.
-6. **Muertes/downs/kills:** alinear fuentes y diferenciar sufridos de causados.
-7. **Healing:** igualar destinatarios, sanitizacion y atribucion sin perder
-   nuestra distincion entre ausencia y cero ni presentar curacion efectiva no
-   demostrada.
+6. **Muertes/downs/kills:** muertes y downs sufridos alineados con los cambios
+   de estado de Elite Insights; las kills siguen dependiendo de killing blows
+   visibles y no se igualan los causados.
+7. **Healing:** desde v0.2.28 el alcance es el de Elite Insights (todo objetivo
+   aliado, sin exigir escuadron) y el dano a barrera no cuenta como dano. Queda
+   la sanitizacion fina (peers, mascotas receptoras, ecos del mismo milisegundo)
+   y la verificacion numerica contra un informe real.
 8. **Conservar UX propia salvo decision expresa:** tres colores, puntuacion
    ponderada, scroll y filtros de presentacion no necesitan copiar la UI de
    AxiBridge para que sus metricas base sean comparables.
@@ -444,6 +469,10 @@ No se han importado dependencias ni copiado implementaciones upstream.
 - Local: [parser y estructuras](src/evtc.rs), [healing y limpias](src/healing.rs),
   [ranking](src/danger.rs), [ventanas/tooltips/copia](src/ui.rs),
   [valores iniciales](settings.default.json).
+- Elite Insights: copias de referencia en [elitei/](elitei/README.md), tomadas de
+  `master` el 2026-11-08 (`HealingStatsExtensionHandler`, `EXTFinalOutgoingHealingStat`,
+  `HealthDamageEvent`, `SupportStatistics`...). Se usan para fijar reglas
+  (`IFF.Friend`, dano de salud sin barrera), no como dependencia.
 - AxiBridge: [dependencia][ab-package], [lectores de metricas][ab-dashboard],
   [contribucion/healing][ab-combat], [agregacion][ab-aggregation],
   [resumen de informes][ab-report], [especificacion][ab-spec].

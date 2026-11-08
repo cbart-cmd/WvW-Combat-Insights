@@ -2,7 +2,42 @@
 //! En WvW el juego oculta nombre, cuenta y guild de los enemigos: solo llega su rango WvW como nombre.
 //! El calculo de equipos y strips sigue al de WvW Fight Analysis para que las cifras cuadren.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::BuildHasherDefault};
+
+/// Multiplicative (Fx-style) hasher for agent addresses and instance IDs looked up
+/// several times per event. Keys come from the local log, so SipHash's HashDoS
+/// resistance only costs time.
+#[derive(Default)]
+pub(crate) struct FastHasher(u64);
+
+impl std::hash::Hasher for FastHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            self.write_u64(u64::from(byte));
+        }
+    }
+    fn write_u8(&mut self, n: u8) {
+        self.write_u64(u64::from(n));
+    }
+    fn write_u16(&mut self, n: u16) {
+        self.write_u64(u64::from(n));
+    }
+    fn write_u32(&mut self, n: u32) {
+        self.write_u64(u64::from(n));
+    }
+    fn write_u64(&mut self, n: u64) {
+        self.0 = (self.0.rotate_left(5) ^ n).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+    fn write_usize(&mut self, n: usize) {
+        self.write_u64(n as u64);
+    }
+}
+
+pub(crate) type FastMap<K, V> = HashMap<K, V, BuildHasherDefault<FastHasher>>;
+pub(crate) type FastSet<K> = std::collections::HashSet<K, BuildHasherDefault<FastHasher>>;
 
 #[path = "contribution.rs"]
 mod contribution;
@@ -17,8 +52,6 @@ pub enum HealingCoverage {
     #[default]
     Missing,
     Unsupported,
-    /// The POV's recorded squad cannot be established (including subgroup 0).
-    UnknownGroup,
     Partial,
     /// Reserved for independently verified recording continuity. EVTC alone
     /// cannot establish this, so this parser never emits Complete.
@@ -77,7 +110,8 @@ pub struct Player {
     pub subgroup: Option<u8>,
     /// Membership in the POV's recorded squad, not merely the same WvW color.
     pub squad_member: bool,
-    /// Observed outgoing healing to recorded squad recipients (includes self/pets).
+    /// Recorded outgoing healing to friendly targets, like Elite Insights
+    /// (includes self and pets; not restricted to the POV squad).
     /// Only meaningful with `healing_coverage == Partial`; never a complete total.
     pub healing: u64,
     /// Observed barrier, separately gated by `barrier_coverage`.
@@ -294,7 +328,7 @@ mod sc {
     pub const NONE: u8 = 0;
     #[cfg(test)]
     pub const CHANGE_UP: u8 = 3;
-    #[cfg(test)]
+    pub const CHANGE_DEAD: u8 = 4;
     pub const CHANGE_DOWN: u8 = 5;
     #[cfg(test)]
     pub const SPAWN: u8 = 6;
@@ -331,7 +365,7 @@ fn player_weapon(ev: &Event, player: &Player) -> Option<weapon_skills::WeaponSki
     (ev.src_master_instid == 0 && skill.profession == player.profession).then_some(skill)
 }
 
-fn infer_weapons(events: &[Event], players: &mut [Player], by_addr: &HashMap<u64, usize>) {
+fn infer_weapons(events: &[Event], players: &mut [Player], by_addr: &FastMap<u64, usize>) {
     let mut has_casts = vec![false; players.len()];
     for ev in events {
         if weapon_cast(ev)
@@ -468,7 +502,7 @@ pub fn parse(bytes: &[u8], vs_players_only: bool) -> Result<Fight, String> {
     let agent_count = read_u32(at)? as usize;
     at += 4;
     let mut players: Vec<Player> = Vec::new();
-    let mut by_addr: HashMap<u64, usize> = HashMap::new();
+    let mut by_addr: FastMap<u64, usize> = FastMap::default();
     for _ in 0..agent_count {
         let block = bytes.get(at..at + 96).ok_or("log truncado en agentes")?;
         at += 96;
@@ -508,14 +542,28 @@ pub fn parse(bytes: &[u8], vs_players_only: bool) -> Result<Fight, String> {
 
 fn analyze_events(
     mut players: Vec<Player>,
-    by_addr: HashMap<u64, usize>,
+    by_addr: FastMap<u64, usize>,
     events: Vec<Event>,
     vs_players_only: bool,
 ) -> Fight {
     let initial_subgroups: Vec<_> = players.iter().map(|player| player.subgroup).collect();
-    // primera pasada: equipos, punto de vista y duracion
+    // primera pasada: equipos, punto de vista, duracion e instancias conocidas
+    let mut instid: FastMap<u16, usize> = FastMap::default();
     let mut team_ids: HashMap<u32, Team> = HashMap::new();
     for ev in &events {
+        // los cambios de estado solo llevan instid para agentes fuera de rango
+        if ev.is_statechange == sc::NONE && ev.is_activation == 0 {
+            if let Some(&i) = by_addr.get(&ev.src_agent)
+                && ev.src_instid != 0
+            {
+                instid.insert(ev.src_instid, i);
+            }
+            if let Some(&i) = by_addr.get(&ev.dst_agent)
+                && ev.dst_instid != 0
+            {
+                instid.insert(ev.dst_instid, i);
+            }
+        }
         match ev.is_statechange {
             sc::WVW_TEAMS => {
                 let red = (ev.dst_agent >> 32) as u32;
@@ -575,35 +623,34 @@ fn analyze_events(
     infer_weapons(&events, &mut players, &by_addr);
     contribution::collect(&events, &by_addr, &mut players);
 
-    // segunda pasada: dano y strips; los instid se resuelven sobre la marcha para atribuir
-    // al dueno el dano de mascotas, clones e invocaciones
-    let mut instid: HashMap<u16, usize> = HashMap::new();
+    // segunda pasada: muertes, derribos, dano y strips. Los cambios de estado son la
+    // fuente de muertes/derribos, como en Elite Insights: llegan tambien sin killing blow.
     for ev in &events {
         let remove_all = ev.is_statechange == sc::BUFF_REMOVE_ALL;
-        if (ev.is_statechange != sc::NONE && !remove_all) || ev.is_activation != 0 {
+        if ev.is_statechange != sc::NONE {
+            if matches!(ev.is_statechange, sc::CHANGE_DEAD | sc::CHANGE_DOWN) {
+                let agent = by_addr.get(&ev.src_agent).copied().or_else(|| {
+                    (ev.src_instid != 0)
+                        .then(|| instid.get(&ev.src_instid).copied())
+                        .flatten()
+                });
+                if let Some(agent) = agent {
+                    if ev.is_statechange == sc::CHANGE_DEAD {
+                        players[agent].deaths += 1;
+                    } else {
+                        players[agent].downs += 1;
+                    }
+                }
+            }
+            if !remove_all {
+                continue;
+            }
+        }
+        if ev.is_activation != 0 {
             continue;
         }
         let src = by_addr.get(&ev.src_agent).copied();
         let dst = by_addr.get(&ev.dst_agent).copied();
-        if let Some(i) = src
-            && ev.src_instid != 0
-        {
-            instid.insert(ev.src_instid, i);
-        }
-        if let Some(i) = dst
-            && ev.dst_instid != 0
-        {
-            instid.insert(ev.dst_instid, i);
-        }
-        if ev.buff == 0
-            && let Some(target) = dst
-        {
-            match ev.result {
-                RESULT_KILLING_BLOW => players[target].deaths += 1,
-                RESULT_DOWNED => players[target].downs += 1,
-                _ => {}
-            }
-        }
         let owner = |direct: Option<usize>, master: u16| {
             direct.or_else(|| {
                 (master != 0)
@@ -647,6 +694,10 @@ fn analyze_events(
         let vs_player = opposed(attacker, dst);
         if ev.buff == 0 && ev.result == RESULT_KILLING_BLOW && vs_player {
             players[attacker].kills += 1;
+        }
+        // El dano absorbido por barrera no es dano a la salud, como en Elite Insights.
+        if ev.is_shields != 0 {
+            continue;
         }
         let (amount, condi) = match ev.buff {
             0 if is_hit(ev.result) && ev.value > 0 => (ev.value as u64, false),
@@ -1247,13 +1298,14 @@ mod tests {
     }
 
     #[test]
-    fn healing_restricts_to_recorded_pov_squad_not_allies_or_enemies() {
-        let events = [heal_event(1, 3, 100, false), heal_event(1, 2, 999, false)];
+    fn healing_counts_every_friendly_target_like_elite_insights() {
+        // Enemigo (IFF = 1) fuera; aliado de escuadron y aliado sin subgrupo dentro.
+        let mut enemy = heal_event(1, 2, 999, false);
+        enemy[48] = 1;
+        let events = [heal_event(1, 3, 100, false), enemy];
         let fight = parse(&healing_log(&events, Some(2)), true).unwrap();
         assert_eq!(fight.players[0].healing, 100);
-        assert!(fight.is_group_member(&fight.players[0]));
         assert!(fight.is_squad_member(&fight.players[2]));
-        assert!(!fight.is_group_member(&fight.players[2]));
         assert!(!fight.is_squad_member(&fight.players[1]));
         for (i, raw) in [
             (0, b"POV\0:POV.1234\00\0".as_slice()),
@@ -1265,15 +1317,8 @@ mod tests {
             bytes[at..at + 64].fill(0);
             bytes[at..at + raw.len()].copy_from_slice(raw);
             let fight = parse(&bytes, true).unwrap();
-            assert_eq!(fight.players[0].healing, 0);
-            assert_eq!(
-                fight.players[0].healing_coverage,
-                if i == 0 {
-                    HealingCoverage::UnknownGroup
-                } else {
-                    HealingCoverage::Missing
-                }
-            );
+            // Sin escuadron ni subgrupo identificables la cura sigue contando.
+            assert_eq!(fight.players[0].healing, 100);
         }
         assert_eq!(read_name(b"Ally\0\02\0").2, Some(2));
         assert_eq!(read_name(b"Ally\0\02\0").1, "");
@@ -1339,10 +1384,8 @@ mod tests {
         )
         .unwrap();
         assert!(!fight.players[0].squad_member);
-        assert_eq!(
-            fight.players[0].healing_coverage,
-            HealingCoverage::UnknownGroup
-        );
+        assert_eq!(fight.players[0].healing, 100);
+        assert_eq!(fight.players[0].healing_coverage, HealingCoverage::Partial);
     }
 
     #[test]
@@ -1356,7 +1399,8 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(fight.players[0].healing, 2_147_483_648);
+        // El directo y las curas ya no dependen del subgrupo: ambas curaciones suman.
+        assert_eq!(fight.players[0].healing, 2_147_483_648 + 999);
         assert!(!fight.players[2].squad_member);
     }
 
@@ -1452,11 +1496,32 @@ mod tests {
     }
 
     #[test]
-    fn counts_deaths_and_downs_by_victim_team_even_without_damage() {
+    fn barrier_absorbed_damage_is_not_health_damage() {
+        let mut absorbed = damage_event(2, 1, 900, 0, 0, 1);
+        absorbed[58] = 1;
+        let mut absorbed_condi = damage_event(2, 1, 0, 400, 1, 0);
+        absorbed_condi[58] = 1;
         let events = [
-            damage_event(1, 2, 0, 0, 0, RESULT_DOWNED),
+            damage_event(2, 1, 100, 0, 0, 1),
+            absorbed,
+            absorbed_condi,
+            // Ni el dano a barrera cuenta para la contribucion al derribo.
+            damage_event(2, 1, 0, 0, 0, RESULT_DOWNED),
+        ];
+        let fight = parse(&log_with_events(&events), true).unwrap();
+        assert_eq!(fight.players[1].damage, 100);
+        assert_eq!(fight.players[1].strike_damage, 100);
+        assert_eq!(fight.players[1].condi_damage, 0);
+        assert_eq!(fight.players[1].down_contribution, 100);
+    }
+
+    #[test]
+    fn counts_deaths_and_downs_by_victim_team_from_statechanges() {
+        let events = [
+            state_event(1_000, 2, sc::CHANGE_DOWN),
+            state_event(1_100, 2, sc::CHANGE_DEAD),
+            state_event(1_200, 3, sc::CHANGE_DOWN),
             damage_event(1, 2, 0, 0, 0, RESULT_KILLING_BLOW),
-            damage_event(1, 3, 0, 0, 0, RESULT_DOWNED),
         ];
         let fight = parse(&log_with_events(&events), true).unwrap();
 

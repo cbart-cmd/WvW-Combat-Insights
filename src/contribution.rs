@@ -1,13 +1,12 @@
 //! Native AxiLog 1.16.0 damage-to-downs methodology; see calculos.md.
 
-use super::{Event, Player, RESULT_DOWNED, sc};
-use std::collections::HashMap;
+use super::{Event, FastMap, Player, RESULT_DOWNED, sc};
 
-struct Instances(HashMap<u16, Vec<(u64, u64)>>);
+struct Instances(FastMap<u16, Vec<(u64, u64)>>);
 
 impl Instances {
     fn build(events: &[Event]) -> Self {
-        let mut histories: HashMap<u16, Vec<(u64, u64)>> = HashMap::new();
+        let mut histories: FastMap<u16, Vec<(u64, u64)>> = FastMap::default();
         for event in events {
             if matches!(event.is_statechange, sc::EXTENSION | sc::EXTENSION_COMBAT) {
                 continue;
@@ -54,7 +53,7 @@ impl Instances {
     }
 }
 
-pub(super) fn collect(events: &[Event], by_addr: &HashMap<u64, usize>, players: &mut [Player]) {
+pub(super) fn collect(events: &[Event], by_addr: &FastMap<u64, usize>, players: &mut [Player]) {
     let mut downs: Vec<_> = events
         .iter()
         .filter(|event| event.is_statechange == sc::NONE && event.result == RESULT_DOWNED)
@@ -82,6 +81,7 @@ pub(super) fn collect(events: &[Event], by_addr: &HashMap<u64, usize>, players: 
         } else if event.is_statechange == sc::NONE
             && event.is_activation == 0
             && event.is_buffremove == 0
+            && event.is_shields == 0
             && !matches!(event.result, 10 | 12)
             && let Some(&target) = by_addr.get(&event.dst_agent)
         {

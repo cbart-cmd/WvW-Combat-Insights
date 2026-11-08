@@ -34,15 +34,32 @@ impl<'a> Bits<'a> {
         Ok(val & ((1u32 << need) - 1))
     }
 
+    /// Siguientes `need` bits sin consumirlos; pasado el final se rellenan con ceros.
+    fn peek(&mut self, need: u32) -> u32 {
+        while self.bit_cnt < need && self.pos < self.data.len() {
+            self.bit_buf |= (self.data[self.pos] as u32) << self.bit_cnt;
+            self.pos += 1;
+            self.bit_cnt += 8;
+        }
+        self.bit_buf & ((1u32 << need) - 1)
+    }
+
     fn align(&mut self) {
+        // `peek` puede haber leido bytes completos por adelantado: se devuelven.
+        self.pos -= (self.bit_cnt / 8) as usize;
         self.bit_buf = 0;
         self.bit_cnt = 0;
     }
 }
 
+/// Bits de la tabla de acceso directo; los codigos mas largos usan el camino bit a bit.
+const FAST_BITS: u32 = 10;
+
 struct Huffman {
     count: [u16; MAX_BITS + 1],
     symbol: Vec<u16>,
+    /// Indexada por los siguientes FAST_BITS bits: `(longitud << 9) | simbolo`, 0 = camino lento.
+    fast: Vec<u16>,
 }
 
 impl Huffman {
@@ -72,10 +89,35 @@ impl Huffman {
                 offs[len as usize] += 1;
             }
         }
-        Ok(Self { count, symbol })
+        // Codigos canonicos: `symbol` ya esta ordenado por longitud y luego por simbolo.
+        let mut fast = vec![0u16; 1 << FAST_BITS];
+        let (mut code, mut index) = (0u32, 0usize);
+        for len in 1..=FAST_BITS as usize {
+            for _ in 0..count[len] {
+                // deflate empaqueta los codigos Huffman desde el bit mas significativo
+                let reversed = code.reverse_bits() >> (32 - len);
+                let entry = ((len as u16) << 9) | symbol[index];
+                for slot in (reversed as usize..fast.len()).step_by(1 << len) {
+                    fast[slot] = entry;
+                }
+                code += 1;
+                index += 1;
+            }
+            code <<= 1;
+        }
+        Ok(Self {
+            count,
+            symbol,
+            fast,
+        })
     }
 
     fn decode(&self, bits: &mut Bits) -> Result<u16, String> {
+        let entry = self.fast[bits.peek(FAST_BITS) as usize];
+        if entry != 0 {
+            bits.bits(u32::from(entry >> 9))?;
+            return Ok(entry & 0x1ff);
+        }
         let (mut code, mut first, mut index) = (0i32, 0i32, 0i32);
         for len in 1..=MAX_BITS {
             code |= bits.bits(1)? as i32;
@@ -135,14 +177,12 @@ fn codes(
                     return Err("deflate: distancia fuera de rango".into());
                 }
                 let start = out.len() - distance;
-                if distance >= len {
-                    out.extend_from_within(start..start + len);
-                } else {
-                    // copia solapada: cada byte puede depender del recien escrito
-                    for k in 0..len {
-                        let byte = out[start + k];
-                        out.push(byte);
-                    }
+                // copia solapada en tramos de `distance`: cada tramo ya esta escrito
+                let mut copied = 0;
+                while copied < len {
+                    let n = (len - copied).min(distance);
+                    out.extend_from_within(start + copied..start + copied + n);
+                    copied += n;
                 }
                 if out.len() > limit {
                     return Err("deflate: datos descomprimidos demasiado grandes".into());

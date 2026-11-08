@@ -5,6 +5,7 @@
   "log_dir": "",
   "healing_sort": 0,
   "show_weapons": true,
+  "class_colors": true,
   "initial_team": 1,
   "windows": [
     {
@@ -17,9 +18,8 @@
       "position": [391, 1],
       "width": 259,
       "height": 78,
-      "columns": 6,
       "opacity": 0.49,
-      "follow_latest": false
+      "follow_latest": true
     },
     {
       "enabled": true,
@@ -33,7 +33,7 @@
       "height": 112,
       "columns": 14,
       "opacity": 0.38,
-      "follow_latest": false
+      "follow_latest": true
     },
     {
       "enabled": true,
@@ -47,7 +47,7 @@
       "height": 116,
       "columns": 14,
       "opacity": 0.32,
-      "follow_latest": false
+      "follow_latest": true
     }
   ]
 }

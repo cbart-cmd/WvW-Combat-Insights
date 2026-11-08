@@ -18,6 +18,8 @@ use nexus::{
 use std::sync::{Arc, LazyLock, Mutex};
 
 const DIM: [f32; 4] = [0.7, 0.7, 0.7, 1.0];
+/// Fondo de fila por clase: casi opaco para que el color se lea sobre el juego.
+const CLASS_ROW_ALPHA: f32 = 0.85;
 const TITLES: [Text; 3] = [Text::Overview, Text::Highlights, Text::Healing];
 const SHORT_TITLES: [Text; 3] = [Text::Overview, Text::HighlightsShort, Text::Healing];
 
@@ -125,6 +127,13 @@ struct Workspace {
 }
 
 impl Workspace {
+    fn initialize(&mut self, settings: &mut Settings) {
+        self.views[HEALING].sort = settings.healing_sort;
+        let follow = settings.windows[SUMMARY].follow_latest;
+        self.follow_latest(settings, follow);
+        self.initialized = true;
+    }
+
     fn select_combat(&mut self, settings: &mut Settings, report: Arc<Report>) {
         for (view, w) in self.views.iter_mut().zip(&mut settings.windows) {
             view.set_report(Some(Arc::clone(&report)));
@@ -154,6 +163,7 @@ enum Action {
     SelectReport(Arc<Report>),
     FollowLatest(bool),
     ShowWeapons(bool),
+    ClassColors(bool),
 }
 
 fn is_wvw_map(map_id: u32, kind: u32) -> bool {
@@ -226,18 +236,14 @@ pub fn render(ui: &Ui) {
     let mut st = app::state();
     let mut workspace = WORKSPACE.lock().unwrap_or_else(|e| e.into_inner());
     if !workspace.initialized {
-        workspace.views[HEALING].sort = st.settings.healing_sort;
-        let follow = st.settings.windows[SUMMARY].follow_latest;
-        workspace.follow_latest(&mut st.settings, follow);
-        workspace.initialized = true;
+        workspace.initialize(&mut st.settings);
     }
     let before = st.settings.clone();
     let language = i18n::current();
     let combat = crate::live::in_player_combat();
     let mut actions = Vec::new();
     for kind in 0..3 {
-        let config = st.settings.clone();
-        let mut w = config.windows[kind].clone();
+        let mut w = st.settings.windows[kind].clone();
         if !w.enabled || !w.visible || (combat && w.hide_in_combat) {
             continue;
         }
@@ -253,7 +259,7 @@ pub fn render(ui: &Ui) {
             &format!("FAD_Window_{kind}"),
             &mut workspace.views[kind],
             &mut w,
-            &config,
+            &st.settings,
             &st.history,
             &st.status,
             language,
@@ -301,6 +307,9 @@ pub fn render(ui: &Ui) {
             }
             Action::ShowWeapons(show) => {
                 st.settings.show_weapons = show;
+            }
+            Action::ClassColors(show) => {
+                st.settings.class_colors = show;
             }
             Action::ShowTeam(report, team) => {
                 let w = &mut st.settings.windows[DETAILS];
@@ -469,7 +478,7 @@ fn render_window(
         match kind {
             SUMMARY => overview(ui, &report, w.opacity, language, actions),
             DETAILS => highlights(ui, &report, view, config, w.columns, language),
-            HEALING => healing(ui, &report, view, w.columns, language),
+            HEALING => healing(ui, &report, view, w.columns, config.class_colors, language),
             _ => unreachable!(),
         }
         if ui.is_window_hovered()
@@ -632,6 +641,14 @@ fn window_menu(
             w.width = defaults.width;
             w.height = defaults.height;
             w.opacity = defaults.opacity;
+        }
+        if kind != SUMMARY {
+            let mut class_colors = config.class_colors;
+            if MenuItem::new(language.widget(Text::ClassColors))
+                .build_with_ref(ui, &mut class_colors)
+            {
+                actions.push(Action::ClassColors(class_colors));
+            }
         }
     }
     if let Some(_menu) = ui.begin_menu(language.widget(Text::PositionMenu)) {
@@ -1137,26 +1154,29 @@ fn highlights(
             ui.dummy([width, row_height]);
             continue;
         }
-        let tooltip = format!(
-            "{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}",
-            language.text(Text::Dps),
-            short_number(fight.dps(p)),
-            language.text(Text::Damage),
-            p.damage,
-            language.text(Text::Strips),
-            p.strips,
-            language.text(Text::DownContribution),
-            p.down_contribution,
-            language.format(
-                Text::DamageTip,
-                &[p.strike_damage.to_string(), p.condi_damage.to_string()]
+        let tooltip = || {
+            format!(
+                "{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}",
+                language.text(Text::Dps),
+                short_number(fight.dps(p)),
+                language.text(Text::Damage),
+                p.damage,
+                language.text(Text::Strips),
+                p.strips,
+                language.text(Text::DownContribution),
+                p.down_contribution,
+                language.format(
+                    Text::DamageTip,
+                    &[p.strike_damage.to_string(), p.condi_damage.to_string()]
+                )
             )
-        );
+        };
         player_row(
             ui,
             p,
             index,
             false,
+            config.class_colors,
             &cache.values[position],
             &columns,
             &tooltip,
@@ -1177,8 +1197,12 @@ fn clipped_name(ui: &Ui, name: &str, width: f32) -> String {
         return String::new();
     }
     let mut text = String::new();
+    let mut candidate = String::new();
     for ch in name.chars() {
-        let candidate = format!("{text}{ch}...");
+        candidate.clear();
+        candidate.push_str(&text);
+        candidate.push(ch);
+        candidate.push_str("...");
         if ui.calc_text_size(&candidate)[0] > width {
             break;
         }
@@ -1193,9 +1217,10 @@ fn player_row(
     player: &Player,
     index: usize,
     profession_only: bool,
+    class_colors: bool,
     values: &[String],
     columns: &[MetricColumn],
-    extra: &str,
+    extra: &dyn Fn() -> String,
     language: Language,
 ) {
     let pos = ui.cursor_screen_pos();
@@ -1204,6 +1229,17 @@ fn player_row(
     let value_width: f32 = columns.iter().map(|c| c.width).sum();
     ui.invisible_button(format!("player{index}"), [width, height]);
     let hovered = ui.is_item_hovered();
+    let background = class_colors.then(|| player.class_color());
+    if let Some(bg) = background {
+        ui.get_window_draw_list()
+            .add_rect(
+                pos,
+                [pos[0] + width, pos[1] + height],
+                [bg[0], bg[1], bg[2], CLASS_ROW_ALPHA],
+            )
+            .filled(true)
+            .build();
+    }
     let name_left = height + 3.0;
     let name_width = (width - name_left - value_width - 5.0).max(0.0);
     let elite = if profession_only { 0 } else { player.elite };
@@ -1237,13 +1273,15 @@ fn player_row(
         .filled(true)
         .build();
     }
+    let text_color = background.map_or_else(|| player.class_color(), contrast_text);
     list.add_text(
         [pos[0] + name_left, pos[1]],
-        player.class_color(),
+        text_color,
         clipped_name(ui, name, name_width),
     );
     drop(list);
-    draw_metrics(ui, pos, width, columns, values, [1.0; 4]);
+    let metrics_color = background.map_or([1.0; 4], contrast_text);
+    draw_metrics(ui, pos, width, columns, values, metrics_color);
     if hovered {
         ui.tooltip_text(format!(
             "{}\n{}\n{}\n{}: {}\n{}",
@@ -1254,8 +1292,18 @@ fn player_row(
             player
                 .subgroup
                 .map_or_else(|| "?".into(), |s| s.to_string()),
-            extra
+            extra()
         ));
+    }
+}
+
+/// Blanco sobre fondos oscuros y casi negro sobre claros, para que el nombre y las
+/// cifras se lean sobre el color de clase.
+fn contrast_text(color: [f32; 4]) -> [f32; 4] {
+    if 0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2] > 0.6 {
+        [0.07, 0.07, 0.07, 1.0]
+    } else {
+        [1.0, 1.0, 1.0, 1.0]
     }
 }
 
@@ -1297,7 +1345,14 @@ fn weapon_row(ui: &Ui, player: &Player, language: Language) {
     }
 }
 
-fn healing(ui: &Ui, report: &Report, view: &mut View, mask: u8, language: Language) {
+fn healing(
+    ui: &Ui,
+    report: &Report,
+    view: &mut View,
+    mask: u8,
+    class_colors: bool,
+    language: Language,
+) {
     let fight = &report.fight;
     match fight.healing_coverage {
         HealingCoverage::Missing | HealingCoverage::Unsupported => {
@@ -1309,10 +1364,6 @@ fn healing(ui: &Ui, report: &Report, view: &mut View, mask: u8, language: Langua
             {
                 return;
             }
-        }
-        HealingCoverage::UnknownGroup => {
-            ui.text_wrapped(language.text(Text::HealingNoGroup));
-            return;
         }
         HealingCoverage::Partial | HealingCoverage::Complete => {}
     }
@@ -1353,34 +1404,53 @@ fn healing(ui: &Ui, report: &Report, view: &mut View, mask: u8, language: Langua
             language.text(Text::ContextTip)
         ));
     }
-    for index in rows {
+    let rows_values = rows.iter().zip(&values);
+    for (&index, values) in rows_values {
         let p = &fight.players[index];
-        let tooltip = format!(
-            "{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}\n{}",
-            language.text(Text::HealingAmount),
-            healing_text(p, 1, false),
-            language.text(Text::Barrier),
-            healing_text(p, 2, false),
-            language.text(Text::Total),
-            healing_text(p, 0, false),
-            language.text(Text::Cleanses),
-            healing_text(p, 3, false),
-            language.text(Text::PerSecond),
-            healing_value(p, view.sort)
-                .filter(|_| fight.duration_ms > 0)
-                .map_or_else(
-                    || "-".into(),
-                    |n| short_number(n as f64 / fight.duration_secs())
-                ),
-            language.text(Text::HealingRecorded),
-            if partial {
-                language.text(Text::HealingPartial)
-            } else {
-                ""
-            }
+        let pos = ui.cursor_screen_pos();
+        let width = ui.content_region_avail()[0];
+        let height = ui.text_line_height();
+        if !ui.is_rect_visible(pos, [pos[0] + width, pos[1] + height]) {
+            ui.dummy([width, height]);
+            continue;
+        }
+        let tooltip = || {
+            format!(
+                "{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n{}\n{}",
+                language.text(Text::HealingAmount),
+                healing_text(p, 1, false),
+                language.text(Text::Barrier),
+                healing_text(p, 2, false),
+                language.text(Text::Total),
+                healing_text(p, 0, false),
+                language.text(Text::Cleanses),
+                healing_text(p, 3, false),
+                language.text(Text::PerSecond),
+                healing_value(p, view.sort)
+                    .filter(|_| fight.duration_ms > 0)
+                    .map_or_else(
+                        || "-".into(),
+                        |n| short_number(n as f64 / fight.duration_secs())
+                    ),
+                language.text(Text::HealingRecorded),
+                if partial {
+                    language.text(Text::HealingPartial)
+                } else {
+                    ""
+                }
+            )
+        };
+        player_row(
+            ui,
+            p,
+            index,
+            true,
+            class_colors,
+            values,
+            &columns,
+            &tooltip,
+            language,
         );
-        let values: [String; 4] = std::array::from_fn(|metric| healing_text(p, metric, true));
-        player_row(ui, p, index, true, &values, &columns, &tooltip, language);
     }
 }
 
@@ -1702,6 +1772,14 @@ mod tests {
         assert!(!super::should_render(None, true));
         assert!(!super::should_render(Some(true), false));
         assert!(super::should_render(Some(true), true));
+    }
+
+    #[test]
+    fn class_row_text_contrasts_with_the_profession_color() {
+        use crate::evtc::profession_color;
+        // Necromancer (verde): blanco. Guardian (amarillo claro): casi negro.
+        assert_eq!(contrast_text(profession_color(8)), [1.0, 1.0, 1.0, 1.0]);
+        assert_eq!(contrast_text(profession_color(1)), [0.07, 0.07, 0.07, 1.0]);
     }
 
     #[test]
@@ -2353,7 +2431,7 @@ mod tests {
                         "Summary cells must be text-height"
                     );
                     let mut view = View::default();
-                    healing(&ui, &report, &mut view, 6, Language::English);
+                    healing(&ui, &report, &mut view, 6, true, Language::English);
                     assert_eq!(
                         ui.item_rect_size()[1],
                         ui.text_line_height(),

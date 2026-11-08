@@ -23,6 +23,7 @@ pub struct WindowSettings {
     pub position: [f32; 2],
     pub width: f32,
     pub height: f32,
+    #[serde(default)]
     pub columns: u8,
     pub opacity: f32,
     pub follow_latest: bool,
@@ -57,9 +58,13 @@ impl WindowSettings {
         } else {
             defaults.height
         };
-        self.columns &= if kind == SUMMARY { 0b111 } else { 0b1111 };
-        if self.columns == 0 {
-            self.columns = defaults.columns;
+        if kind == SUMMARY {
+            self.columns = 0;
+        } else {
+            self.columns &= 0b1111;
+            if self.columns == 0 {
+                self.columns = defaults.columns;
+            }
         }
     }
 }
@@ -79,6 +84,8 @@ pub struct Settings {
     /// 0 = total, 1 = healing, 2 = barrier, 3 = cleanses.
     pub healing_sort: usize,
     pub show_weapons: bool,
+    /// Fila con el fondo del color de la clase en Destacados y Healing.
+    pub class_colors: bool,
     /// 0 = first enemy, 1 = own team, 2..4 = red/blue/green.
     pub initial_team: usize,
 }
@@ -153,6 +160,7 @@ impl Settings {
                 "visible" => s.windows[SUMMARY].visible = flag,
                 "healing_sort" => s.healing_sort = value.parse().unwrap_or(0).min(3),
                 "show_weapons" => s.show_weapons = flag,
+                "class_colors" => s.class_colors = flag,
                 "initial_team" => s.initial_team = value.parse().unwrap_or(0).min(4),
                 _ => {}
             }
@@ -200,7 +208,7 @@ impl Settings {
                 window.columns |= 8;
             }
             if !compact_layout && window.width == [380.0, 480.0, 520.0][kind] {
-                window.width = 175.0;
+                window.width = WindowSettings::for_kind(kind).width;
             }
         }
         if !own_team_layout && s.initial_team == 0 {
@@ -211,13 +219,14 @@ impl Settings {
 
     pub fn to_text(&self) -> String {
         let mut text = format!(
-            "layout_version=5\nhistory_size={}\nvs_players_only={}\nmin_duration_secs={}\nlog_dir={}\nhealing_sort={}\nshow_weapons={}\ninitial_team={}\n",
+            "layout_version=5\nhistory_size={}\nvs_players_only={}\nmin_duration_secs={}\nlog_dir={}\nhealing_sort={}\nshow_weapons={}\nclass_colors={}\ninitial_team={}\n",
             self.history_size,
             self.vs_players_only as u8,
             self.min_duration_secs,
             self.log_dir,
             self.healing_sort,
             self.show_weapons as u8,
+            self.class_colors as u8,
             self.initial_team,
         );
         use std::fmt::Write;
@@ -225,10 +234,14 @@ impl Settings {
             .into_iter()
             .zip(&self.windows)
         {
-            writeln!(text, "{name}.enabled={}\n{name}.visible={}\n{name}.auto_show={}\n{name}.hide_in_combat={}\n{name}.fixed_position={}\n{name}.locked={}\n{name}.x={}\n{name}.y={}\n{name}.width={}\n{name}.opacity={}\n{name}.follow_latest={}\n{name}.height={}\n{name}.columns={}",
+            writeln!(text, "{name}.enabled={}\n{name}.visible={}\n{name}.auto_show={}\n{name}.hide_in_combat={}\n{name}.fixed_position={}\n{name}.locked={}\n{name}.x={}\n{name}.y={}\n{name}.width={}\n{name}.opacity={}\n{name}.follow_latest={}\n{name}.height={}",
                 w.enabled as u8, w.visible as u8, w.auto_show as u8, w.hide_in_combat as u8,
                 w.fixed_position as u8, w.locked as u8, w.position[0], w.position[1], w.width, w.opacity,
-                w.follow_latest as u8, w.height, w.columns).expect("writing settings to a String");
+                w.follow_latest as u8, w.height).expect("writing settings to a String");
+            if name != "summary" {
+                writeln!(text, "{name}.columns={}", w.columns)
+                    .expect("writing settings to a String");
+            }
         }
         text
     }
@@ -336,6 +349,17 @@ mod tests {
     }
 
     #[test]
+    fn class_colors_default_on_and_round_trip_off() {
+        assert!(Settings::default().class_colors);
+        assert!(Settings::parse("history_size=5").class_colors);
+        let s = Settings {
+            class_colors: false,
+            ..Default::default()
+        };
+        assert!(!Settings::parse(&s.to_text()).class_colors);
+    }
+
+    #[test]
     fn round_trip() {
         let s = Settings {
             vs_players_only: false,
@@ -404,7 +428,7 @@ mod tests {
         assert_eq!(Settings::parse(&s.to_text()), s);
         assert!(!s.to_text().contains("show_healing_bars"));
         let migrated = Settings::parse("summary.width=380\ndetails.width=480\nhealing.width=520");
-        assert!(migrated.windows.iter().all(|w| w.width == 175.0));
+        assert_eq!(migrated.windows.map(|w| w.width), [259.0, 300.0, 234.0]);
         assert_eq!(
             Settings::parse("summary.width=410").windows[SUMMARY].width,
             410.0
@@ -418,7 +442,7 @@ mod tests {
         assert_eq!(Settings::parse(&defaults.to_text()), defaults);
         for (kind, window) in defaults.windows.iter().enumerate() {
             assert!(window.enabled && window.visible && window.auto_show && !window.hide_in_combat);
-            assert!(!window.locked && !window.fixed_position && !window.follow_latest);
+            assert!(!window.locked && !window.fixed_position && window.follow_latest);
             assert_eq!(
                 window.position,
                 [[391.0, 1.0], [233.0, 624.0], [0.0, 624.0]][kind]
@@ -426,7 +450,7 @@ mod tests {
             assert_eq!(window.width, [259.0, 300.0, 234.0][kind]);
             assert_eq!(window.opacity, [0.49, 0.38, 0.32][kind]);
             assert_eq!(window.height, [78.0, 112.0, 116.0][kind]);
-            assert_eq!(window.columns, if kind == SUMMARY { 6 } else { 14 });
+            assert_eq!(window.columns, if kind == SUMMARY { 0 } else { 14 });
         }
         let saved = Settings::parse(
             "layout_version=2\nsummary.enabled=0\nsummary.visible=0\nsummary.width=175\nsummary.opacity=0.75\nsummary.x=50\nsummary.y=60\nsummary.locked=1\nsummary.fixed_position=1\nsummary.follow_latest=1\ndetails.height=234",
@@ -441,6 +465,17 @@ mod tests {
         assert_eq!(saved.windows[SUMMARY].opacity, 0.75);
         assert_eq!(saved.windows[SUMMARY].position, [50.0, 60.0]);
         assert_eq!(saved.windows[DETAILS].height, 234.0);
+    }
+
+    #[test]
+    fn summary_columns_are_not_persisted_or_loaded() {
+        let settings = Settings::parse("layout_version=5\nsummary.columns=7\ndetails.columns=6");
+        assert_eq!(settings.windows[SUMMARY].columns, 0);
+        assert_eq!(settings.windows[DETAILS].columns, 6);
+        let saved = settings.to_text();
+        assert!(!saved.contains("summary.columns="));
+        assert!(saved.contains("details.columns=6"));
+        assert_eq!(Settings::parse(&saved), settings);
     }
 
     #[test]

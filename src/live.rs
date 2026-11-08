@@ -25,7 +25,9 @@ struct Agent {
 
 struct Snapshot {
     agents: Vec<(u64, Player, u16)>,
+    /// Only events after `offset`; the worker keeps the full buffer per generation.
     events: Vec<Event>,
+    offset: usize,
     pov: u64,
     generation: u64,
     finished: bool,
@@ -41,16 +43,21 @@ struct Live {
     game_combat: bool,
     pov_instance: u16,
     started: Option<SystemTime>,
+    last_activity: Option<Instant>,
     generation: u64,
     dirty: bool,
     overflow: bool,
     shown: bool,
     events: Vec<Event>,
+    sent: usize,
     metadata: Vec<Event>,
     completed: Vec<Snapshot>,
 }
 
 static LIVE: LazyLock<Mutex<Live>> = LazyLock::new(|| Mutex::new(Live::default()));
+/// Worker-side copy of each generation's events, fed with snapshot deltas so the
+/// combat callback never waits for a full clone of the live buffer.
+static BUFFERS: LazyLock<Mutex<HashMap<u64, Vec<Event>>>> = LazyLock::new(Default::default);
 static REVISION_WARNING: AtomicBool = AtomicBool::new(false);
 static PLAYER_COMBAT: AtomicBool = AtomicBool::new(false);
 
@@ -98,12 +105,15 @@ impl Live {
         if self_event && event.is_statechange == 1 {
             self.game_combat = true;
         }
-        if !self.active && (self.game_combat || in_combat) && self.player_interaction(event) {
+        let interaction = self.player_interaction(event);
+        if !self.active && (self.game_combat || in_combat) && interaction {
             self.begin();
         }
         let recording = self.active;
+        if recording && interaction {
+            self.last_activity = Some(Instant::now());
+        }
         if self_event && event.is_statechange == 2 {
-            self.end();
             self.game_combat = false;
         }
         if !local && recording {
@@ -160,11 +170,13 @@ impl Live {
         self.generation += 1;
         self.participants = self.roster.clone();
         self.events = self.metadata.clone();
+        self.sent = 0;
         self.active = true;
         self.started = Some(SystemTime::now());
         self.dirty = true;
         self.overflow = false;
         self.shown = false;
+        self.last_activity = Some(Instant::now());
     }
 
     fn snapshot(&mut self) -> Snapshot {
@@ -179,13 +191,20 @@ impl Live {
         if finished {
             self.started = None;
         }
+        let offset = self.sent.min(self.events.len());
+        let events = if finished {
+            let tail = self.events.split_off(offset);
+            self.events = Vec::new();
+            self.sent = 0;
+            tail
+        } else {
+            self.sent = self.events.len();
+            self.events[offset..].to_vec()
+        };
         Snapshot {
             agents,
-            events: if finished {
-                std::mem::take(&mut self.events)
-            } else {
-                self.events.clone()
-            },
+            events,
+            offset,
             pov: self.pov,
             generation: self.generation,
             finished,
@@ -206,8 +225,19 @@ impl Live {
     fn end(&mut self) {
         if self.active {
             self.active = false;
-            self.game_combat = false;
             self.dirty = true;
+        }
+        self.game_combat = false;
+        self.last_activity = None;
+    }
+
+    fn end_if_inactive(&mut self, now: Instant, timeout: Duration) {
+        if self.active
+            && self
+                .last_activity
+                .is_some_and(|last| now.saturating_duration_since(last) >= timeout)
+        {
+            self.end();
         }
     }
 
@@ -333,6 +363,8 @@ fn combat(payload: &CombatData, local: bool) {
         }
         if (1..=9).contains(&agent.prof) && agent.elite != u32::MAX {
             let id = agent.id as u64;
+            let active = live.active;
+            let name = agent.name();
             let info = live
                 .roster
                 .entry(id)
@@ -342,21 +374,21 @@ fn combat(payload: &CombatData, local: bool) {
                     }
                     info.player.profession = agent.prof;
                     info.player.elite = agent.elite;
-                    if let Some(name) = agent.name() {
+                    if let Some(name) = name.filter(|n| *n != info.player.name) {
                         info.player.name = name.to_owned();
                     }
                 })
                 .or_insert_with(|| Agent {
                     player: Player {
-                        name: agent.name().unwrap_or("").to_owned(),
+                        name: name.unwrap_or("").to_owned(),
                         profession: agent.prof,
                         elite: agent.elite,
                         ..Default::default()
                     },
                     team: agent.team,
-                })
-                .clone();
-            if live.active {
+                });
+            let info = active.then(|| info.clone());
+            if let Some(info) = info {
                 let participant = live.participants.entry(id).or_insert_with(|| info.clone());
                 participant.team = info.team;
                 participant.player.name = info.player.name;
@@ -427,6 +459,7 @@ pub fn subscribe() {
 
 pub fn reset() {
     *LIVE.lock().unwrap_or_else(|e| e.into_inner()) = Live::default();
+    BUFFERS.lock().unwrap_or_else(|e| e.into_inner()).clear();
     REVISION_WARNING.store(false, Ordering::Relaxed);
     PLAYER_COMBAT.store(false, Ordering::Relaxed);
 }
@@ -435,59 +468,79 @@ pub fn in_player_combat() -> bool {
     PLAYER_COMBAT.load(Ordering::Relaxed) && crate::ui::in_combat()
 }
 
-pub fn refresh(vs_players_only: bool) {
-    let snapshots = {
+pub fn refresh(vs_players_only: bool, inactive_timeout: Duration) {
+    let (snapshots, idle) = {
         let mut live = LIVE.lock().unwrap_or_else(|e| e.into_inner());
-        if !crate::ui::in_combat() {
-            live.end();
-            PLAYER_COMBAT.store(false, Ordering::Relaxed);
-        }
+        live.end_if_inactive(Instant::now(), inactive_timeout);
+        PLAYER_COMBAT.store(live.active, Ordering::Relaxed);
         let mut snapshots = std::mem::take(&mut live.completed);
         if live.dirty && live.started.is_some() {
             snapshots.push(live.snapshot());
         }
-        if live.started.is_none() && snapshots.is_empty() {
-            crate::app::state().live = None;
-        }
-        snapshots
+        (snapshots, live.started.is_none())
     };
+    // Never lock app state while holding LIVE: arcdps callbacks would wait for a UI frame.
+    if idle && snapshots.is_empty() {
+        crate::app::state().live = None;
+    }
     for snapshot in snapshots {
         let start = Instant::now();
-        let fight = evtc::live_fight(
-            &snapshot.agents,
-            &snapshot.events,
-            snapshot.pov,
-            vs_players_only,
-        );
-        let mut live = LIVE.lock().unwrap_or_else(|e| e.into_inner());
-        if snapshot.finished || (live.generation == snapshot.generation && live.active) {
-            let mut state = crate::app::state();
-            if !snapshot.finished && !live.shown {
-                live.shown = true;
-                for window in &mut state.settings.windows {
-                    if window.enabled && window.auto_show && window.follow_latest {
-                        window.visible = true;
-                    }
-                }
+        let fight = {
+            let mut buffers = BUFFERS.lock().unwrap_or_else(|e| e.into_inner());
+            let buffer = buffers.entry(snapshot.generation).or_default();
+            if snapshot.offset == 0 {
+                buffer.clear();
             }
-            let report = Arc::new(Report {
-                path: format!("live-{}", snapshot.generation).into(),
-                file_name: String::new(),
-                fight,
-                parse_time: start.elapsed(),
-                live: Some(LiveStatus {
-                    limited: snapshot.limited,
-                    finished: snapshot.finished,
-                }),
-            });
+            if buffer.len() != snapshot.offset {
+                // A delta was lost (reset race); the next finished EVTC log replaces this view.
+                buffers.remove(&snapshot.generation);
+                continue;
+            }
+            buffer.extend_from_slice(&snapshot.events);
+            let fight = evtc::live_fight(&snapshot.agents, buffer, snapshot.pov, vs_players_only);
             if snapshot.finished {
-                state.store_report(report, true);
-                if !live.active && live.started.is_none() {
-                    state.live = None;
-                }
-            } else {
-                state.live = Some(report);
+                buffers.remove(&snapshot.generation);
             }
+            fight
+        };
+        let (current, show, idle) = {
+            let mut live = LIVE.lock().unwrap_or_else(|e| e.into_inner());
+            let current =
+                snapshot.finished || (live.generation == snapshot.generation && live.active);
+            let show = current && !snapshot.finished && !live.shown;
+            if show {
+                live.shown = true;
+            }
+            (current, show, !live.active && live.started.is_none())
+        };
+        if !current {
+            continue;
+        }
+        let mut state = crate::app::state();
+        if show {
+            for window in &mut state.settings.windows {
+                if window.enabled && window.auto_show && window.follow_latest {
+                    window.visible = true;
+                }
+            }
+        }
+        let report = Arc::new(Report {
+            path: format!("live-{}", snapshot.generation).into(),
+            file_name: String::new(),
+            fight,
+            parse_time: start.elapsed(),
+            live: Some(LiveStatus {
+                limited: snapshot.limited,
+                finished: snapshot.finished,
+            }),
+        });
+        if snapshot.finished {
+            state.store_report(report, true);
+            if idle {
+                state.live = None;
+            }
+        } else {
+            state.live = Some(report);
         }
     }
 }
@@ -506,6 +559,58 @@ pub const REFRESH: Duration = Duration::from_secs(1);
 mod tests {
     use super::*;
     use crate::evtc::{HealingCoverage, Team};
+
+    #[test]
+    fn snapshots_send_only_new_events() {
+        let mut live = Live::default();
+        live.begin();
+        live.push(empty_event());
+        live.push(empty_event());
+        let first = live.snapshot();
+        assert_eq!((first.offset, first.events.len()), (0, 2));
+        live.push(empty_event());
+        let second = live.snapshot();
+        assert_eq!((second.offset, second.events.len()), (2, 1));
+        assert_eq!(live.events.len(), 3);
+        live.end();
+        let last = live.snapshot();
+        assert!(last.finished);
+        assert_eq!((last.offset, last.events.len()), (3, 0));
+        assert!(live.events.is_empty());
+    }
+
+    #[test]
+    fn live_combat_ends_after_configured_inactivity_and_not_before() {
+        let mut live = setup();
+        let timeout = Duration::from_secs(15);
+        let previous_activity = Instant::now() - timeout;
+        live.last_activity = Some(previous_activity);
+
+        live.ingest(
+            &Event {
+                time: 1000,
+                src_agent: 1,
+                dst_agent: 2,
+                value: 100,
+                ..empty_event()
+            },
+            false,
+            false,
+        );
+        let last_activity = live.last_activity.unwrap();
+        assert!(last_activity > previous_activity);
+
+        live.end_if_inactive(last_activity + timeout - Duration::from_millis(1), timeout);
+        assert!(live.active);
+
+        live.end_if_inactive(last_activity + timeout, timeout);
+        assert!(!live.active);
+        assert!(live.last_activity.is_none());
+
+        let mut immediate = setup();
+        immediate.end_if_inactive(Instant::now(), Duration::ZERO);
+        assert!(!immediate.active);
+    }
 
     fn agent(name: &str, account: &str, group: u8, team: u16) -> Agent {
         Agent {
@@ -563,6 +668,12 @@ mod tests {
         };
         live.ingest(&hit, true, true);
         live.ingest(&hit, false, true);
+        live.push(Event {
+            time: 2000,
+            src_agent: 2,
+            is_statechange: 5, // CHANGE_DOWN
+            ..empty_event()
+        });
         live.push(Event {
             time: 2000,
             value: 200,
@@ -643,6 +754,12 @@ mod tests {
             true,
             false,
         );
+        assert!(
+            live.active,
+            "EXIT_COMBAT starts the inactivity grace period"
+        );
+        let timeout = Duration::from_secs(15);
+        live.end_if_inactive(live.last_activity.unwrap() + timeout, timeout);
         assert!(!live.active);
         live.ingest(
             &Event {
@@ -835,6 +952,12 @@ mod tests {
             true,
             false,
         );
+        assert!(
+            live.active,
+            "the fight remains live during the inactivity grace period"
+        );
+        let timeout = Duration::from_secs(15);
+        live.end_if_inactive(live.last_activity.unwrap() + timeout, timeout);
         assert!(!live.active);
     }
 
@@ -869,7 +992,10 @@ mod tests {
             true,
             false,
         );
-        assert!(!live.active);
+        assert!(
+            live.active,
+            "local exit does not end the live report immediately"
+        );
         assert!(live.dirty, "Local exit must publish the final snapshot");
 
         live.roster.get_mut(&1).unwrap().team = 0;

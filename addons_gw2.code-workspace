@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "gw2addonsreleases",
+			"path": "../gw2addonsreleases"
+		},
+		{
+			"name": "fight_analysis_danger",
+			"path": "."
+		},
+		{
+			"name": "gw2-timers",
+			"path": "../gw2-timers"
+		}
+	],
+	"settings": {}
+}

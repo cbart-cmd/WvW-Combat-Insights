@@ -52,3 +52,4 @@ $info = Get-Item $target
 Write-Host "Copiado: $($info.FullName) ($([math]::Round($info.Length / 1KB)) KB, $($info.LastWriteTime))"
 
 Write-Host "Abre Nexus (Ctrl+O) y carga 'WvW Combat Insights' en la lista de addons."
+

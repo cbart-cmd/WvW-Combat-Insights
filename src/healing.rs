@@ -6,8 +6,7 @@
 //! EI prefers source-peer observations over destination-peer observations per source.
 //! Peer flags establish participation, not recording continuity or absence of heals.
 
-use super::{Event, HealingCoverage, Player, is_condition, sc};
-use std::collections::{HashMap, HashSet};
+use super::{Event, FastMap, FastSet, HealingCoverage, Player, is_condition, sc};
 
 const SIGNATURE: u32 = 0x9c9b3c99;
 
@@ -22,7 +21,7 @@ fn member(players: &[Player], groups: &[Option<u8>], pov: Option<usize>, i: usiz
 
 pub(super) fn collect(
     events: &[Event],
-    by_addr: &HashMap<u64, usize>,
+    by_addr: &FastMap<u64, usize>,
     pov_addr: Option<u64>,
     initial_subgroups: &[Option<u8>],
     players: &mut [Player],
@@ -37,7 +36,7 @@ pub(super) fn collect(
     let mut enabled = false;
     // Extension addresses from network peers are not trustworthy. Resolve their
     // instance IDs only from ordinary EVTC events, including recorded pet masters.
-    let mut instances: HashMap<u16, Option<usize>> = HashMap::new();
+    let mut instances: FastMap<u16, Option<usize>> = FastMap::default();
     let mut observations = Vec::new();
     for ev in events {
         if ev.is_statechange == sc::EXTENSION && ev.pad == 0 {
@@ -83,7 +82,9 @@ pub(super) fn collect(
             ) else {
                 continue;
             };
-            if !member(players, &groups, pov, src) || !member(players, &groups, pov, dst) {
+            // Como Elite Insights: cuenta toda cura a un objetivo aliado. El byte IFF
+            // del evento (0 = amigo) es la prueba; no se exige escuadron ni grupo POV.
+            if ev.affinity != 0 {
                 continue;
             }
             // Legacy revision-1 records lack peer bits and are source observations.
@@ -155,12 +156,12 @@ pub(super) fn collect(
             }
         }
     }
-    let source_peers: HashSet<_> = observations
+    let source_peers: FastSet<_> = observations
         .iter()
         .filter(|(_, _, _, _, peer, _)| *peer)
         .map(|(src, _, _, barrier, _, ev)| (*src, ev.src_instid, *barrier))
         .collect();
-    let mut seen = HashSet::new();
+    let mut seen = FastSet::default();
     for (src, dst, amount, barrier, source_peer, ev) in observations {
         if !source_peer && source_peers.contains(&(src, ev.src_instid, barrier)) {
             continue;
@@ -195,18 +196,6 @@ pub(super) fn collect(
             player.healing_coverage = HealingCoverage::Unsupported;
             player.barrier_coverage = HealingCoverage::Unsupported;
         }
-    }
-    if coverage == HealingCoverage::Partial
-        && !pov.is_some_and(|i| member(players, &final_groups, pov, i))
-    {
-        for player in players.iter_mut().filter(|p| {
-            p.healing_coverage == HealingCoverage::Missing
-                && p.barrier_coverage == HealingCoverage::Missing
-        }) {
-            player.healing_coverage = HealingCoverage::UnknownGroup;
-            player.barrier_coverage = HealingCoverage::UnknownGroup;
-        }
-        return HealingCoverage::UnknownGroup;
     }
     coverage
 }
