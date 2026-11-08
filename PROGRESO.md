@@ -3,7 +3,9 @@
 ## v0.2.31: la opacidad atenua las barras de clase
 - El fondo de color de clase se dibujaba con alpha fijo (0.85) y no seguia el ajuste de opacidad, que solo afectaba al fondo negro y al titulo. Ahora su alpha es `0.85 * opacidad`: al 32 % la barra queda al 27 % y al 0 % desaparece.
 - La opacidad se pasa ya calculada a `highlights` y `healing` como `Option<f32>`; `None` significa sin fondo (ajuste desactivado).
-- Validacion: `cargo fmt --check`, 104 tests Rust y 2 de configuracion (nuevo test de `class_row_alpha`).
+- Validacion: `cargo fmt --check`, 104 tests Rust y 2 de configuracion (nuevo test de `class_row_alpha`). DLL MZ de 1.125.888 bytes, MD5 `188d01554d72c0121b7d9af261d9b836`; `GetAddonDef` confirma v0.2.31, firma -1178682436, Direct y URL exacta.
+- Publicado: fuente `32752e5`, distribucion `e8a1cec`, release `fight-analysis-danger-v0.2.31`; quedan 0.2.31 y 0.2.30. Las URL de `raw/main` tardaron ~90 s por la cache de 300 s y el reintento del script las resolvio; las cuatro URL y los dos sidecars coinciden.
+- El push directo a `main` del repo publico omite la regla de rama que exige el check `build`; el CI se ejecuta despues.
 
 ## v0.2.30: icono de especializacion en Healing
 - La ventana de Healing usaba el icono de la profesion base (`profession_icon`), asi que una especializacion de elite aparecia con el icono core. Ahora usa el mismo icono de especializacion que Destacados y cae al de la clase solo cuando la elite no se conoce.
