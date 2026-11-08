@@ -73,6 +73,8 @@ si tiene apertura automatica, volvera a abrirse al terminar un combate valido.
   las cifras a blanco o casi negro segun el contraste. Desactivado, las filas vuelven a ser
   transparentes con el nombre en el color de clase y las cifras en blanco. Es un ajuste comun
   (`class_colors=0/1`) y se aplica tambien a las ventanas adicionales.
+  La **opacidad** de cada ventana atenua tambien estos fondos de color, no solo el fondo negro:
+  al 32 % la barra de clase se ve con el 27 % de opacidad y al 0 % desaparece.
 - Las armas son **estimadas a partir de habilidades utilizadas**, no equipamiento confirmado:
   pueden faltar armas que no se usaron. No se inventan conjuntos ni manos.
 - Se priorizan los lanzamientos reales de habilidades y sus paletas de profesion;

@@ -1,5 +1,10 @@
 # Progreso: fight_analysis_danger
 
+## v0.2.31: la opacidad atenua las barras de clase
+- El fondo de color de clase se dibujaba con alpha fijo (0.85) y no seguia el ajuste de opacidad, que solo afectaba al fondo negro y al titulo. Ahora su alpha es `0.85 * opacidad`: al 32 % la barra queda al 27 % y al 0 % desaparece.
+- La opacidad se pasa ya calculada a `highlights` y `healing` como `Option<f32>`; `None` significa sin fondo (ajuste desactivado).
+- Validacion: `cargo fmt --check`, 104 tests Rust y 2 de configuracion (nuevo test de `class_row_alpha`).
+
 ## v0.2.30: icono de especializacion en Healing
 - La ventana de Healing usaba el icono de la profesion base (`profession_icon`), asi que una especializacion de elite aparecia con el icono core. Ahora usa el mismo icono de especializacion que Destacados y cae al de la clase solo cuando la elite no se conoce.
 - Se elimina el parametro `profession_only` de `player_row` y la funcion `profession_icon`, que ya no tenian uso.

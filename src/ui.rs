@@ -475,10 +475,12 @@ fn render_window(
                 ui.text_wrapped(language.text(Text::LiveNoTeams));
             }
         }
+        // La opacidad de la ventana tambien atenua el fondo de color de clase.
+        let class_alpha = class_row_alpha(config.class_colors, w.opacity);
         match kind {
             SUMMARY => overview(ui, &report, w.opacity, language, actions),
-            DETAILS => highlights(ui, &report, view, config, w.columns, language),
-            HEALING => healing(ui, &report, view, w.columns, config.class_colors, language),
+            DETAILS => highlights(ui, &report, view, config, w.columns, class_alpha, language),
+            HEALING => healing(ui, &report, view, w.columns, class_alpha, language),
             _ => unreachable!(),
         }
         if ui.is_window_hovered()
@@ -1055,6 +1057,7 @@ fn highlights(
     view: &mut View,
     config: &Settings,
     mask: u8,
+    class_alpha: Option<f32>,
     language: Language,
 ) {
     let fight = &report.fight;
@@ -1175,7 +1178,7 @@ fn highlights(
             ui,
             p,
             index,
-            config.class_colors,
+            class_alpha,
             &cache.values[position],
             &columns,
             &tooltip,
@@ -1215,7 +1218,7 @@ fn player_row(
     ui: &Ui,
     player: &Player,
     index: usize,
-    class_colors: bool,
+    class_alpha: Option<f32>,
     values: &[String],
     columns: &[MetricColumn],
     extra: &dyn Fn() -> String,
@@ -1227,13 +1230,13 @@ fn player_row(
     let value_width: f32 = columns.iter().map(|c| c.width).sum();
     ui.invisible_button(format!("player{index}"), [width, height]);
     let hovered = ui.is_item_hovered();
-    let background = class_colors.then(|| player.class_color());
-    if let Some(bg) = background {
+    let background = class_alpha.map(|alpha| (player.class_color(), alpha));
+    if let Some((bg, alpha)) = background {
         ui.get_window_draw_list()
             .add_rect(
                 pos,
                 [pos[0] + width, pos[1] + height],
-                [bg[0], bg[1], bg[2], CLASS_ROW_ALPHA],
+                [bg[0], bg[1], bg[2], alpha],
             )
             .filled(true)
             .build();
@@ -1267,14 +1270,14 @@ fn player_row(
         .filled(true)
         .build();
     }
-    let text_color = background.map_or_else(|| player.class_color(), contrast_text);
+    let text_color = background.map_or_else(|| player.class_color(), |(bg, _)| contrast_text(bg));
     list.add_text(
         [pos[0] + name_left, pos[1]],
         text_color,
         clipped_name(ui, name, name_width),
     );
     drop(list);
-    let metrics_color = background.map_or([1.0; 4], contrast_text);
+    let metrics_color = background.map_or([1.0; 4], |(bg, _)| contrast_text(bg));
     draw_metrics(ui, pos, width, columns, values, metrics_color);
     if hovered {
         ui.tooltip_text(format!(
@@ -1299,6 +1302,11 @@ fn contrast_text(color: [f32; 4]) -> [f32; 4] {
     } else {
         [1.0, 1.0, 1.0, 1.0]
     }
+}
+
+/// Alpha del fondo de fila: el color de clase se atenua con la opacidad de la ventana.
+fn class_row_alpha(class_colors: bool, opacity: f32) -> Option<f32> {
+    class_colors.then(|| CLASS_ROW_ALPHA * opacity.clamp(0.0, 1.0))
 }
 
 fn weapon_row(ui: &Ui, player: &Player, language: Language) {
@@ -1344,7 +1352,7 @@ fn healing(
     report: &Report,
     view: &mut View,
     mask: u8,
-    class_colors: bool,
+    class_alpha: Option<f32>,
     language: Language,
 ) {
     let fight = &report.fight;
@@ -1438,7 +1446,7 @@ fn healing(
             ui,
             p,
             index,
-            class_colors,
+            class_alpha,
             values,
             &columns,
             &tooltip,
@@ -1765,6 +1773,13 @@ mod tests {
         assert!(!super::should_render(None, true));
         assert!(!super::should_render(Some(true), false));
         assert!(super::should_render(Some(true), true));
+    }
+
+    #[test]
+    fn class_row_alpha_follows_window_opacity() {
+        assert_eq!(class_row_alpha(false, 0.5), None);
+        assert_eq!(class_row_alpha(true, 0.0), Some(0.0));
+        assert_eq!(class_row_alpha(true, 0.5), Some(CLASS_ROW_ALPHA * 0.5));
     }
 
     #[test]
@@ -2424,13 +2439,28 @@ mod tests {
                         "Summary cells must be text-height"
                     );
                     let mut view = View::default();
-                    healing(&ui, &report, &mut view, 6, true, Language::English);
+                    healing(
+                        &ui,
+                        &report,
+                        &mut view,
+                        6,
+                        Some(CLASS_ROW_ALPHA),
+                        Language::English,
+                    );
                     assert_eq!(
                         ui.item_rect_size()[1],
                         ui.text_line_height(),
                         "Healing must occupy one text line per player"
                     );
-                    highlights(&ui, &report, &mut view, &config, 6, Language::English);
+                    highlights(
+                        &ui,
+                        &report,
+                        &mut view,
+                        &config,
+                        6,
+                        Some(CLASS_ROW_ALPHA),
+                        Language::English,
+                    );
                     assert!(
                         ui.item_rect_size()[1] <= ui.text_line_height(),
                         "Weapon text must not create tall rows"
@@ -2453,7 +2483,15 @@ mod tests {
                     .size([400.0, 400.0], Condition::Always)
                     .build(&ui, || {
                         let start = ui.cursor_screen_pos()[1];
-                        highlights(&ui, &report, &mut view, &config, 6, Language::English);
+                        highlights(
+                            &ui,
+                            &report,
+                            &mut view,
+                            &config,
+                            6,
+                            Some(CLASS_ROW_ALPHA),
+                            Language::English,
+                        );
                         heights[index] = ui.cursor_screen_pos()[1] - start;
                         line_step = ui.text_line_height() + ui.clone_style().item_spacing[1];
                     });
@@ -2475,7 +2513,15 @@ mod tests {
                 Window::new("temporary-language")
                     .size([400.0, 400.0], Condition::Always)
                     .build(&ui, || {
-                        highlights(&ui, &report, &mut translated_view, &config, 6, language);
+                        highlights(
+                            &ui,
+                            &report,
+                            &mut translated_view,
+                            &config,
+                            6,
+                            Some(CLASS_ROW_ALPHA),
+                            language,
+                        );
                     });
                 ui.render();
                 assert_eq!(
@@ -2795,7 +2841,15 @@ mod tests {
                 .size([300.0, 160.0], Condition::Always)
                 .position([10.0, 10.0], Condition::Always)
                 .build(&ui, || {
-                    highlights(&ui, &large, &mut view, &config, 6, Language::English);
+                    highlights(
+                        &ui,
+                        &large,
+                        &mut view,
+                        &config,
+                        6,
+                        Some(CLASS_ROW_ALPHA),
+                        Language::English,
+                    );
                     let rows = &view.highlights.as_ref().unwrap().rows;
                     assert_eq!(rows.len(), 60);
                     if frame > 0 {
@@ -2935,6 +2989,7 @@ mod tests {
                     &mut live_view,
                     &config,
                     6,
+                    Some(CLASS_ROW_ALPHA),
                     Language::English,
                 );
                 assert_eq!(live_view.team, Some(Team::Own));

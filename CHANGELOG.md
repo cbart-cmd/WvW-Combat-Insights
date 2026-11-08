@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.31
+
+- Window opacity now also fades the class-color row backgrounds instead of only the
+  window background: the bar alpha is the row alpha times the window opacity.
+
 ## 0.2.30
 
 - Healing rows use the elite specialization icon, like Highlights, instead of the
