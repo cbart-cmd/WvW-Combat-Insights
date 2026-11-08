@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.2.29
+
+- Class-color row background in Highlights and Healing (on by default): each row is
+  tinted with the profession color and the name and numbers switch to white or
+  near-black for contrast. Turn it off in right-click -> Style to return to
+  transparent rows. Lives in the shared class_colors setting.
+- Add 	ools/publish.ps1 and 	ools/verify-release.ps1: build, DLL/MD5 to the
+  distribution repo, gitattributes and staged-blob checks, push, release with
+  --latest=false, keep the two newest releases and verify every download URL.
+- Add litei/ reference copies of the Elite Insights sources used to fix rules.
+
+## 0.2.28
+
+- Healing and barrier follow Elite Insights: every event whose IFF byte marks a
+  friendly target counts, including the player, pets and allies outside the squad.
+  Knowing the POV squad is no longer required.
+- Barrier-absorbed damage no longer counts as damage, strike damage, condition
+  damage or down contribution, matching Elite Insights health damage.
+
+## 0.2.27
+
+- A real log now replaces its provisional live fight when their event ranges
+  overlap, instead of requiring full containment, so the same fight is no longer
+  listed twice.
+
+## 0.2.26
+
+- The live report closes after arcdps' [session] wvwinactive timeout instead of
+  immediately on exit combat, and is then kept in the session history.
+
+## 0.2.25
+
+- Kills, deaths and downs come from EVTC state changes, matching Elite Insights.
+
+## 0.2.24
+
+- Build with one codegen unit: smaller DLL, same analysis.
+
+## 0.2.23
+
+- Faster decompression and log analysis.
+
+## 0.2.22
+
+- Parser and live performance, fewer UI allocations, no row cap in Healing.
+
+## 0.2.21
+
+- Squad healing and barrier from Healing Stats, cleanses, estimated weapons and
+  per-team danger ranking.
 ## 0.2.20
 
 - Version-only release to test Nexus auto-update from 0.2.19 through the existing
