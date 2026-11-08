@@ -1,5 +1,8 @@
 # WvW Combat Insights
 
+Donwloads / descargas: [https://github.com/cbart-cmd/gw2addonsreleases/releases](https://github.com/cbart-cmd/gw2addonsreleases/releases).
+
+
 Resumen de equipos, jugadores destacados y healing de tus combates WvW.
 Addon de [Nexus](https://raidcore.gg/Nexus) para Guild Wars 2, compatible con
 [WvW Fight Analysis](https://github.com/jake-greygoose/WvW-Fight-Analysis-Addon).
