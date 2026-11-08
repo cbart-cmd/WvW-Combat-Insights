@@ -212,21 +212,27 @@ function Test-Published($dll, $md5, $addon, $version, $slug, $tag, $dllName, $di
     $failed = @()
     foreach ($name in $targets.Keys) {
         $url = $targets[$name]
-        try {
-            $bytes = Download-Bytes $url 12
-            $got = Get-Md5 $bytes
-            $okSize = $bytes.Length -eq $dll.Length
-            $okMd5 = $got -eq $md5
-            $okMz = $bytes[0] -eq 0x4D -and $bytes[1] -eq 0x5A
-            if ($okSize -and $okMd5 -and $okMz) {
-                Ok "$name : $($bytes.Length) bytes, MD5 y MZ correctos"
-            } else {
-                $failed += "$name (len $($bytes.Length), md5 $got, mz $okMz)"
-                Warn "$name no coincide: $($bytes.Length) bytes, md5 $got, mz=$okMz"
+        while ($true) {
+            $problem = $null
+            try {
+                $bytes = Download-Bytes $url 1
+                $got = Get-Md5 $bytes
+                if ($bytes.Length -eq $dll.Length -and $got -eq $md5 -and $bytes[0] -eq 0x4D -and $bytes[1] -eq 0x5A) {
+                    Ok "$name : $($bytes.Length) bytes, MD5 y MZ correctos"
+                    break
+                }
+                $problem = "len $($bytes.Length), md5 $got"
+            } catch {
+                $problem = $_.Exception.Message
             }
-        } catch {
-            $failed += "$name ($($_.Exception.Message))"
-            Warn "$name no descarga: $($_.Exception.Message)"
+            if ((Get-Date) -ge $deadline) {
+                $failed += "$name ($problem)"
+                Warn "$name sigue sin coincidir tras esperar la cache: $problem"
+                break
+            }
+            # La cache de raw/main (max-age de 300 s) y los assets recien creados tardan.
+            Warn "$name no coincide aun ($problem); reintento en 30 s"
+            Start-Sleep -Seconds 30
         }
     }
     $sidecars = [ordered]@{
@@ -255,7 +261,7 @@ function Test-Published($dll, $md5, $addon, $version, $slug, $tag, $dllName, $di
             }
         }
     }
-    if ($failed.Count -gt 0) { Fail "verificacion incompleta:`n  - " + ($failed -join "`n  - ") }
+    if ($failed.Count -gt 0) { Fail ("verificacion incompleta: " + ($failed -join '; ')) }
     Ok "Publicacion verificada: DLL, URLs y sidecars"
 }
 

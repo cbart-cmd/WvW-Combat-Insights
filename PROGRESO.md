@@ -3,6 +3,10 @@
 ## v0.2.30: icono de especializacion en Healing
 - La ventana de Healing usaba el icono de la profesion base (`profession_icon`), asi que una especializacion de elite aparecia con el icono core. Ahora usa el mismo icono de especializacion que Destacados y cae al de la clase solo cuando la elite no se conoce.
 - Se elimina el parametro `profession_only` de `player_row` y la funcion `profession_icon`, que ya no tenian uso.
+- Validacion: `cargo fmt --check`, 103 tests Rust y 2 de configuracion; `cargo build --release`. DLL MZ de 1.125.376 bytes, MD5 `1e765f455c718354cf8cd3cc08d7d0a9`. `GetAddonDef` confirma v0.2.30, firma -1178682436, Direct y URL exacta.
+- Publicado con `tools/publish.ps1`: fuente `6ed2c1c`, distribucion `7cb28f6`, release `fight-analysis-danger-v0.2.30`; quedan solo 0.2.30 y 0.2.29. La verificacion choco con la cache de 300 s de `raw/main` en la URL exacta y la antigua; el reintento del script la resolvio y las cuatro URL y los dos sidecars coinciden.
+- `tools/publish.ps1` ahora reintenta cualquier URL que no coincida (antes solo los sidecars) y resume los fallos en una linea.
+- Pendiente la prueba visual en GW2 y la copia manual de la DLL al juego.
 
 ## Unificacion del repositorio publico (v0.2.29)
 - Desde v0.2.21 el desarrollo se estaba subiendo solo al repositorio privado `Fight-Analysis-Danger` y este repositorio publico se quedo en v0.2.20.
