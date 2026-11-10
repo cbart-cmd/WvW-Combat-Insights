@@ -1,5 +1,10 @@
 # Progreso: fight_analysis_danger
 
+## v0.2.32: atribuir bajas sin killing blow
+- Las muertes del EVTC que no tienen un `RESULT_KILLING_BLOW` registrado se asignan como kills al equipo rival que mas dano hizo a ese equipo durante el log; sin dano que permita decidir, se asignan al rival con mas jugadores registrados.
+- Las bajas que ya tenian atribucion se conservan; el total es una estimacion a nivel de equipo y no modifica las muertes/derribos reportados.
+- Validacion pendiente: suite Rust, ejemplo con el EVTC `20261110-230742.zevtc` y build release.
+
 ## v0.2.31: la opacidad atenua las barras de clase
 - El fondo de color de clase se dibujaba con alpha fijo (0.85) y no seguia el ajuste de opacidad, que solo afectaba al fondo negro y al titulo. Ahora su alpha es `0.85 * opacidad`: al 32 % la barra queda al 27 % y al 0 % desaparece.
 - La opacidad se pasa ya calculada a `highlights` y `healing` como `Option<f32>`; `None` significa sin fondo (ajuste desactivado).

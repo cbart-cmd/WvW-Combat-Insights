@@ -26,8 +26,8 @@ Addon de <a href="https://raidcore.gg/Nexus">Nexus</a> para Guild Wars 2, compat
 <p>Antes <strong>Fight Analysis Danger</strong>. Se conserva <code>fight_analysis_danger.dll</code>,
 la firma, el endpoint de actualizacion y la carpeta de ajustes. No hay que renombrar ni reinstalar.
 El historial es temporal y se reconstruye desde los logs tras reiniciar.</p>
-<p><strong>Version 0.2.25:</strong> cuenta muertes y derribos desde los cambios de estado del EVTC; el tooltip coincide con
-<code>Dead</code> y <code>Downs</code> de Elite Insights y no se pierden muertes sin killing blow ni aliados fuera de escuadron.
+<p><strong>Version 0.2.32:</strong> las kills sin killing blow se atribuyen al equipo rival que mas dano hizo al equipo muerto;
+si no hay dano identificable, se usa el equipo rival con mas jugadores.
 La version 0.2.24 compila la DLL con una sola unidad de codigo para reducir su tamano sin retirar funciones.
 La version 0.2.23 optimiza la descompresion, el analisis de logs y el directo; actualiza la migracion
 de anchos antiguos y elimina el ajuste sin uso de columnas de Resumen.</p>
@@ -53,7 +53,8 @@ Cerrar una no cierra las otras; la apertura automatica puede volver a mostrarla 
 Los tooltips muestran nombre del equipo, kills, muertes y derribos. Los totales incluyen todos
 los jugadores registrados del color, no solo el escuadron ni la poblacion actual del mapa.
 Muertes y derribos se leen de los cambios de estado del EVTC y coinciden
-con <code>Dead</code> y <code>Downs</code> de Elite Insights.</p>
+con <code>Dead</code> y <code>Downs</code> de Elite Insights. Las kills sin killing blow se estiman a nivel de equipo:
+se asignan al rival con mas dano contra ese equipo, o al rival con mas jugadores si no hay dano para comparar.</p>
 <p>Destacados permite elegir equipo desde pestanas de color o el menu contextual: solo muestra colores presentes en el combate, incluido el aliado.
 Muestra los jugadores del equipo con dano o corrups registrados, con scroll y sin duplicados; oculta quienes tienen ambos a cero.
 Orden inicial por <strong>dano total + corrups × 2000 + Down contribution</strong>, sin columna de puntuacion visible.

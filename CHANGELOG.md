@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.32
+
+- Attribute deaths without a recorded killing blow to the enemy team that dealt the
+  most damage to the victim team; fall back to the largest enemy roster when damage
+  cannot distinguish a team.
+
 ## 0.2.31
 
 - Window opacity now also fades the class-color row backgrounds instead of only the

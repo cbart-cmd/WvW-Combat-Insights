@@ -268,6 +268,32 @@ pub fn team_event_counts(fight: &Fight, team: Team) -> TeamEventCounts {
         })
 }
 
+fn infer_unattributed_kills(
+    deaths: [u32; 3],
+    kills_by_target: [[u32; 3]; 3],
+    damage_by_target: [[u64; 3]; 3],
+    team_sizes: [usize; 3],
+) -> [u32; 3] {
+    let mut inferred = [0; 3];
+    for (victim, &death_count) in deaths.iter().enumerate() {
+        let confirmed = (0..3)
+            .filter(|&attacker| attacker != victim)
+            .map(|attacker| kills_by_target[victim][attacker])
+            .sum::<u32>();
+        let missing = death_count.saturating_sub(confirmed);
+        if missing == 0 {
+            continue;
+        }
+        let attacker = (0..3)
+            .filter(|&team| team != victim && team_sizes[team] > 0)
+            .max_by_key(|&team| (damage_by_target[victim][team], team_sizes[team]));
+        if let Some(attacker) = attacker {
+            inferred[attacker] += missing;
+        }
+    }
+    inferred
+}
+
 #[derive(Clone, Copy)]
 struct Event {
     time: u64,
@@ -587,6 +613,8 @@ fn analyze_events(
     let (mut first, mut last) = (u64::MAX, 0u64);
     let mut end_unix = 0u64;
     let mut language = None;
+    let mut kills_by_target = [[0; 3]; 3];
+    let mut damage_by_target = [[0; 3]; 3];
     for ev in &events {
         match ev.is_statechange {
             sc::NONE => {
@@ -694,6 +722,15 @@ fn analyze_events(
         let vs_player = opposed(attacker, dst);
         if ev.buff == 0 && ev.result == RESULT_KILLING_BLOW && vs_player {
             players[attacker].kills += 1;
+            if let Some(target) = dst
+                && let (Some(attacker_team), Some(victim_team)) = (
+                    players[attacker].team.and_then(team_index),
+                    players[target].team.and_then(team_index),
+                )
+                && attacker_team != victim_team
+            {
+                kills_by_target[victim_team][attacker_team] += 1;
+            }
         }
         // El dano absorbido por barrera no es dano a la salud, como en Elite Insights.
         if ev.is_shields != 0 {
@@ -708,12 +745,47 @@ fn analyze_events(
         if vs_players_only && !vs_player {
             continue;
         }
+        if let Some(target) = dst
+            && let (Some(attacker_team), Some(victim_team)) = (
+                players[attacker].team.and_then(team_index),
+                players[target].team.and_then(team_index),
+            )
+            && attacker_team != victim_team
+        {
+            damage_by_target[victim_team][attacker_team] += amount;
+        }
         let p = &mut players[attacker];
         p.damage += amount;
         if condi {
             p.condi_damage += amount;
         } else {
             p.strike_damage += amount;
+        }
+    }
+
+    let mut deaths_by_team = [0; 3];
+    let mut team_sizes = [0; 3];
+    for player in &players {
+        if let Some(team) = player.team.and_then(team_index) {
+            deaths_by_team[team] += player.deaths;
+            team_sizes[team] += 1;
+        }
+    }
+    for (team, count) in infer_unattributed_kills(
+        deaths_by_team,
+        kills_by_target,
+        damage_by_target,
+        team_sizes,
+    )
+    .into_iter()
+    .enumerate()
+    {
+        if count > 0
+            && let Some(player) = players
+                .iter_mut()
+                .find(|player| player.team.and_then(team_index) == Some(team))
+        {
+            player.kills += count;
         }
     }
 
@@ -735,6 +807,10 @@ fn analyze_events(
         players,
         healing_coverage,
     }
+}
+
+fn team_index(team: Team) -> Option<usize> {
+    Team::ALL.iter().position(|&candidate| candidate == team)
 }
 
 pub(crate) fn live_fight(
@@ -1540,6 +1616,46 @@ mod tests {
                 downs: 1,
             }
         );
+    }
+
+    #[test]
+    fn attributes_uncredited_deaths_to_top_damage_team_or_larger_roster() {
+        let deaths = [0, 5, 0];
+        let mut kills_by_target = [[0; 3]; 3];
+        let mut damage_by_target = [[0; 3]; 3];
+        damage_by_target[1][0] = 200;
+        damage_by_target[1][2] = 100;
+        let team_sizes = [5, 1, 20];
+
+        assert_eq!(
+            infer_unattributed_kills(deaths, kills_by_target, damage_by_target, team_sizes),
+            [5, 0, 0]
+        );
+
+        damage_by_target = [[0; 3]; 3];
+        assert_eq!(
+            infer_unattributed_kills(deaths, kills_by_target, damage_by_target, team_sizes),
+            [0, 0, 5]
+        );
+
+        kills_by_target[1][0] = 2;
+        assert_eq!(
+            infer_unattributed_kills(deaths, kills_by_target, damage_by_target, team_sizes),
+            [0, 0, 3]
+        );
+    }
+
+    #[test]
+    fn team_kills_include_deaths_without_a_recorded_killing_blow() {
+        let events = [
+            damage_event(1, 2, 100, 0, 0, 0),
+            state_event(1_100, 2, sc::CHANGE_DEAD),
+        ];
+        let fight = parse(&log_with_events(&events), true).unwrap();
+
+        assert_eq!(fight.players[1].deaths, 1);
+        assert_eq!(team_event_counts(&fight, Team::Red).kills, 1);
+        assert_eq!(team_event_counts(&fight, Team::Green).deaths, 1);
     }
 
     #[test]

@@ -8,7 +8,7 @@ Antes **Fight Analysis Danger**. Se conserva `fight_analysis_danger.dll`, la fir
 el endpoint de actualizacion y la carpeta de ajustes: no hace falta renombrar ni reinstalar nada.
 El historial en memoria se reconstruye desde los logs; no se guarda entre reinicios.
 
-**Version 0.2.25:** cuenta muertes y derribos desde los cambios de estado del EVTC, así el tooltip coincide con `Dead` y `Downs` de Elite Insights y no se pierden muertes sin killing blow ni aliados fuera de escuadrón.
+**Version 0.2.32:** las bajas sin killing blow se atribuyen al equipo enemigo que más daño hizo al equipo muerto; si no hay daño identificable, se usa el equipo rival con más jugadores.
 La version 0.2.24 compila la DLL con una sola unidad de codigo para reducir su tamano sin retirar funciones.
 La version 0.2.23 optimiza la descompresion, el analisis de logs y el directo; actualiza la migracion
 de anchos antiguos y elimina el ajuste sin uso de columnas de Resumen.
@@ -45,6 +45,7 @@ si tiene apertura automatica, volvera a abrirse al terminar un combate valido.
 - Celdas del color del equipo **con la altura exacta del texto**, sin botones gruesos, y cifras blancas de alto contraste. El tooltip identifica el color,
   el equipo propio y los totales de kills, muertes y derribos registrados. Muertes y derribos usan los cambios de estado
   del EVTC, de modo que coinciden con `Dead` y `Downs` de Elite Insights y no dependen de que el killing blow sea visible.
+  Las kills sin killing blow son una estimacion a nivel de equipo: se asignan al rival con mas dano contra ese equipo, o al rival con mas jugadores si no hay dano para comparar.
 - Los jugadores incluyen todos los agentes de ese color en el log, no solo el grupo/escuadron.
   No es una estimacion de poblacion actual del mapa.
 - Clicar la celda de color o las kills muestra **Jugadores destacados** para ese equipo y combate.
