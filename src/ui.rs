@@ -753,6 +753,59 @@ fn team_down_contribution(fight: &Fight, team: Team) -> u64 {
         .fold(0u64, |total, p| total.saturating_add(p.down_contribution))
 }
 
+struct OverviewScope {
+    label: Text,
+    count: usize,
+    kills: u32,
+    deaths: u32,
+    downs: u32,
+    damage: u64,
+    strips: u64,
+    contribution: u64,
+}
+
+fn overview_scope(fight: &Fight) -> Option<OverviewScope> {
+    let pov = fight.players.iter().position(|player| player.is_pov)?;
+    let group_members: Vec<_> = fight
+        .players
+        .iter()
+        .enumerate()
+        .filter(|(_, player)| player.is_pov || fight.is_group_member(player))
+        .map(|(i, _)| i)
+        .collect();
+    let squad_members: Vec<_> = fight
+        .players
+        .iter()
+        .enumerate()
+        .filter(|(_, player)| player.is_pov || fight.is_squad_member(player))
+        .map(|(i, _)| i)
+        .collect();
+    let has_other_subgroup = squad_members
+        .iter()
+        .any(|&i| fight.players[i].subgroup != fight.pov_subgroup);
+    let (label, members) = if has_other_subgroup {
+        (Text::Squad, squad_members)
+    } else if group_members.len() > 1 {
+        (Text::Group, group_members)
+    } else {
+        (Text::Player, vec![pov])
+    };
+    let players = members.iter().map(|&i| &fight.players[i]);
+
+    Some(OverviewScope {
+        label,
+        count: members.len(),
+        kills: players.clone().map(|p| p.confirmed_kills).sum(),
+        deaths: players.clone().map(|p| p.deaths).sum(),
+        downs: players.clone().map(|p| p.downs).sum(),
+        damage: players
+            .clone()
+            .fold(0u64, |total, p| total.saturating_add(p.damage)),
+        strips: players.clone().map(|p| u64::from(p.strips)).sum(),
+        contribution: players.fold(0u64, |total, p| total.saturating_add(p.down_contribution)),
+    })
+}
+
 fn overview(
     ui: &Ui,
     report: &Arc<Report>,
@@ -774,20 +827,67 @@ fn overview(
             )
         })
         .collect();
-    let damage_width = totals.iter().fold(
-        ui.calc_text_size(language.text(Text::Damage))[0],
-        |width, (_, damage, _, _)| width.max(ui.calc_text_size(damage)[0]),
-    ) + 5.0;
-    let strips_width = totals.iter().fold(
-        ui.calc_text_size(language.text(Text::Strips))[0],
-        |width, (_, _, strips, _)| width.max(ui.calc_text_size(strips)[0]),
-    ) + 5.0;
-    let contribution_width = totals.iter().fold(
-        ui.calc_text_size(language.text(Text::DownContributionShort))[0],
-        |width, (_, _, _, contribution)| width.max(ui.calc_text_size(contribution)[0]),
-    ) + 5.0;
-    let scale = (width * 0.80
-        / (kills_width + 4.0 + damage_width + strips_width + contribution_width))
+    let scope = overview_scope(fight);
+    let damage_width = totals
+        .iter()
+        .fold(
+            ui.calc_text_size(language.text(Text::Damage))[0],
+            |width, (_, damage, _, _)| width.max(ui.calc_text_size(damage)[0]),
+        )
+        .max(scope.as_ref().map_or(0.0, |scope| {
+            ui.calc_text_size(short_number(scope.damage as f64))[0]
+        }))
+        + 5.0;
+    let strips_width = totals
+        .iter()
+        .fold(
+            ui.calc_text_size(language.text(Text::Strips))[0],
+            |width, (_, _, strips, _)| width.max(ui.calc_text_size(strips)[0]),
+        )
+        .max(
+            scope
+                .as_ref()
+                .map_or(0.0, |scope| ui.calc_text_size(scope.strips.to_string())[0]),
+        )
+        + 5.0;
+    let contribution_width = totals
+        .iter()
+        .fold(
+            ui.calc_text_size(language.text(Text::DownContributionShort))[0],
+            |width, (_, _, _, contribution)| width.max(ui.calc_text_size(contribution)[0]),
+        )
+        .max(scope.as_ref().map_or(0.0, |scope| {
+            ui.calc_text_size(short_number(scope.contribution as f64))[0]
+        }))
+        + 5.0;
+    let kills_width = kills_width.max(
+        scope
+            .as_ref()
+            .map_or(0.0, |scope| ui.calc_text_size(scope.kills.to_string())[0]),
+    );
+    let metric_width = kills_width + 4.0 + damage_width + strips_width + contribution_width;
+    let label_width = scope
+        .as_ref()
+        .map_or(0.0, |scope| {
+            ui.calc_text_size(language.text(scope.label))[0]
+        })
+        .max(
+            totals
+                .iter()
+                .map(|(team, _, _, _)| {
+                    ui.calc_text_size(
+                        fight
+                            .players
+                            .iter()
+                            .filter(|player| player.team == Some(*team))
+                            .count()
+                            .to_string(),
+                    )[0]
+                })
+                .fold(0.0, f32::max),
+        );
+    let scale = (width * 0.80 / metric_width)
+        .min(((width - label_width - 3.0).max(0.0)) / metric_width)
         .min(1.0);
     let columns = vec![
         MetricColumn {
@@ -838,6 +938,71 @@ fn overview(
         ],
         DIM,
     );
+    if let Some(scope) = &scope {
+        let pos = ui.cursor_screen_pos();
+        let height = ui.text_line_height();
+        ui.invisible_button("summary_scope", [width, height]);
+        let hovered = ui.is_item_hovered();
+        let list = ui.get_window_draw_list();
+        let mut color = [0.28, 0.30, 0.34, opacity];
+        if hovered {
+            for component in &mut color[..3] {
+                *component += 0.1;
+            }
+        }
+        let cell_width = (width - columns.iter().map(|c| c.width).sum::<f32>() - 3.0).max(1.0);
+        list.add_rect(pos, [pos[0] + cell_width, pos[1] + height], color)
+            .filled(true)
+            .build();
+        let label = clipped_name(ui, language.text(scope.label), cell_width);
+        let text_width = ui.calc_text_size(&label)[0];
+        list.add_text(
+            [pos[0] + (cell_width - text_width) / 2.0, pos[1]],
+            [1.0; 4],
+            &label,
+        );
+        drop(list);
+        draw_metrics(
+            ui,
+            pos,
+            width,
+            &columns,
+            &[
+                String::new(),
+                scope.kills.to_string(),
+                short_number(scope.damage as f64),
+                scope.strips.to_string(),
+                short_number(scope.contribution as f64),
+            ],
+            [1.0; 4],
+        );
+        if hovered {
+            let name = language.text(scope.label);
+            ui.tooltip_text(format!(
+                "{}\n{}\n{}",
+                language.format(
+                    Text::TeamEventsTip,
+                    &[
+                        name.into(),
+                        scope.count.to_string(),
+                        scope.kills.to_string(),
+                        scope.deaths.to_string(),
+                        scope.downs.to_string(),
+                    ],
+                ),
+                language.text(Text::ScopeKillsTip),
+                format!(
+                    "{}: {}\n{}: {}\n{}: {}",
+                    language.text(Text::Damage),
+                    scope.damage,
+                    language.text(Text::Strips),
+                    scope.strips,
+                    language.text(Text::DownContribution),
+                    scope.contribution
+                )
+            ));
+        }
+    }
     for (team, damage, strips, contribution) in &totals {
         let team = *team;
         let count = fight
@@ -1783,6 +1948,58 @@ mod tests {
     }
 
     #[test]
+    fn summary_scope_expands_from_player_to_group_to_squad_and_uses_confirmed_kills() {
+        let player = Player {
+            team: Some(Team::Blue),
+            subgroup: Some(1),
+            is_pov: true,
+            squad_member: true,
+            confirmed_kills: 2,
+            kills: 5,
+            damage: 100,
+            ..Default::default()
+        };
+        let group_member = Player {
+            team: Some(Team::Blue),
+            subgroup: Some(1),
+            squad_member: true,
+            confirmed_kills: 3,
+            kills: 3,
+            damage: 200,
+            ..Default::default()
+        };
+        let squad_member = Player {
+            team: Some(Team::Blue),
+            subgroup: Some(2),
+            squad_member: true,
+            confirmed_kills: 7,
+            kills: 7,
+            damage: 300,
+            ..Default::default()
+        };
+        let mut fight = Fight {
+            pov_team: Some(Team::Blue),
+            pov_subgroup: Some(1),
+            players: vec![player.clone()],
+            ..Default::default()
+        };
+
+        let scope = overview_scope(&fight).unwrap();
+        assert!(matches!(scope.label, Text::Player));
+        assert_eq!((scope.count, scope.kills, scope.damage), (1, 2, 100));
+
+        fight.players.push(group_member);
+        let scope = overview_scope(&fight).unwrap();
+        assert!(matches!(scope.label, Text::Group));
+        assert_eq!((scope.count, scope.kills, scope.damage), (2, 5, 300));
+
+        fight.players.push(squad_member);
+        let scope = overview_scope(&fight).unwrap();
+        assert!(matches!(scope.label, Text::Squad));
+        assert_eq!((scope.count, scope.kills, scope.damage), (3, 12, 600));
+    }
+
+    #[test]
     fn class_row_text_contrasts_with_the_profession_color() {
         use crate::evtc::profession_color;
         // Necromancer (verde): blanco. Guardian (amarillo claro): casi negro.
@@ -2274,6 +2491,7 @@ mod tests {
                         profession: 1,
                         team: Some(Team::Green),
                         damage: 10_000,
+                        is_pov: true,
                         weapons: vec!["Spear"],
                         underwater_weapons: vec!["Spear"],
                         subgroup: Some(1),

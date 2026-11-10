@@ -106,6 +106,8 @@ pub struct Player {
     pub team: Option<Team>,
     /// Raw arcdps team identity for live hostility, independent of color metadata.
     pub live_team_id: Option<u16>,
+    /// Player who recorded the fight.
+    pub is_pov: bool,
     /// Subgrupo EVTC: 1..=15 pertenece a la escuadra; 0 no pertenece.
     pub subgroup: Option<u8>,
     /// Membership in the POV's recorded squad, not merely the same WvW color.
@@ -126,6 +128,8 @@ pub struct Player {
     pub strips: u32,
     /// Observed full condition removals performed on recorded squad recipients.
     pub cleanses: u32,
+    /// Killing blows directly recorded for this player, excluding team-level estimates.
+    pub confirmed_kills: u32,
     pub kills: u32,
     pub deaths: u32,
     pub downs: u32,
@@ -721,6 +725,7 @@ fn analyze_events(
         }
         let vs_player = opposed(attacker, dst);
         if ev.buff == 0 && ev.result == RESULT_KILLING_BLOW && vs_player {
+            players[attacker].confirmed_kills += 1;
             players[attacker].kills += 1;
             if let Some(target) = dst
                 && let (Some(attacker_team), Some(victim_team)) = (
@@ -789,12 +794,12 @@ fn analyze_events(
         }
     }
 
-    let pov_team = pov
-        .and_then(|addr| by_addr.get(&addr))
-        .and_then(|&i| players[i].team);
-    let pov_subgroup = pov
-        .and_then(|addr| by_addr.get(&addr))
-        .and_then(|&i| players[i].subgroup);
+    let pov_index = pov.and_then(|addr| by_addr.get(&addr)).copied();
+    if let Some(i) = pov_index {
+        players[i].is_pov = true;
+    }
+    let pov_team = pov_index.and_then(|i| players[i].team);
+    let pov_subgroup = pov_index.and_then(|i| players[i].subgroup);
     let healing_coverage =
         healing::collect(&events, &by_addr, pov, &initial_subgroups, &mut players);
     Fight {
@@ -1489,7 +1494,9 @@ mod tests {
         ];
         for filter in [false, true] {
             let fight = parse(&log_with_events(&events), filter).unwrap();
+            assert!(fight.players[0].is_pov);
             assert_eq!(fight.players[0].kills, 2);
+            assert_eq!(fight.players[0].confirmed_kills, 2);
             assert_eq!(team_event_counts(&fight, Team::Red).kills, 2);
         }
     }
@@ -1654,6 +1661,7 @@ mod tests {
         let fight = parse(&log_with_events(&events), true).unwrap();
 
         assert_eq!(fight.players[1].deaths, 1);
+        assert_eq!(fight.players[0].confirmed_kills, 0);
         assert_eq!(team_event_counts(&fight, Team::Red).kills, 1);
         assert_eq!(team_event_counts(&fight, Team::Green).deaths, 1);
     }

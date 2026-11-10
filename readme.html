@@ -26,8 +26,8 @@ Addon de <a href="https://raidcore.gg/Nexus">Nexus</a> para Guild Wars 2, compat
 <p>Antes <strong>Fight Analysis Danger</strong>. Se conserva <code>fight_analysis_danger.dll</code>,
 la firma, el endpoint de actualizacion y la carpeta de ajustes. No hay que renombrar ni reinstalar.
 El historial es temporal y se reconstruye desde los logs tras reiniciar.</p>
-<p><strong>Version 0.2.32:</strong> las kills sin killing blow se atribuyen al equipo rival que mas dano hizo al equipo muerto;
-si no hay dano identificable, se usa el equipo rival con mas jugadores.
+<p><strong>Version 0.2.33:</strong> Resumen añade una fila personal con kills confirmadas y metricas de tu personaje,
+grupo o escuadra detectados en el log; no incluye bajas estimadas a nivel de equipo.
 La version 0.2.24 compila la DLL con una sola unidad de codigo para reducir su tamano sin retirar funciones.
 La version 0.2.23 optimiza la descompresion, el analisis de logs y el directo; actualiza la migracion
 de anchos antiguos y elimina el ajuste sin uso de columnas de Resumen.</p>
@@ -44,7 +44,7 @@ Cerrar una no cierra las otras; la apertura automatica puede volver a mostrarla 
 <table>
 <thead><tr><th>Ventana</th><th>Contenido</th><th>Tamano inicial</th></tr></thead>
 <tbody>
-<tr><td>Resumen</td><td>Tres colores, jugadores, kills, dano total, corrups totales y down c por equipo. Corrups cuenta retiradas de boons (strips), como Destacados. Down c suma el Down contribution de los jugadores del color; cabecera con ayuda del nombre completo y total sin abreviar en el tooltip del equipo. Tu equipo primero, sin asterisco. Celdas de la altura exacta del texto.</td><td>259 px</td></tr>
+<tr><td>Resumen</td><td>Fila personal de Jugador, Grupo o Escuadra con kills confirmadas y metricas del alcance detectado, seguida de tres colores con jugadores, kills, dano, corrups y down c. Las kills personales no incluyen estimaciones a nivel de equipo. Corrups cuenta retiradas de boons (strips); down c suma el Down contribution. Tu equipo primero, sin asterisco.</td><td>259 px</td></tr>
 <tr><td>Jugadores destacados</td><td>Pestanas de colores presentes en el combate. Icono de especializacion, nombre, dano, corrups y Down contribution por defecto; columnas configurables. Armas en texto.</td><td>300 px</td></tr>
 <tr><td>Healing</td><td>Una linea por jugador: icono de especializacion (el de la clase si no se conoce la elite), nombre, curas, barrera y limpias por defecto. Columnas configurables, sin barras ni bordes.</td><td>234 px, todas las filas disponibles con scroll</td></tr>
 </tbody>
@@ -54,7 +54,8 @@ Los tooltips muestran nombre del equipo, kills, muertes y derribos. Los totales 
 los jugadores registrados del color, no solo el escuadron ni la poblacion actual del mapa.
 Muertes y derribos se leen de los cambios de estado del EVTC y coinciden
 con <code>Dead</code> y <code>Downs</code> de Elite Insights. Las kills sin killing blow se estiman a nivel de equipo:
-se asignan al rival con mas dano contra ese equipo, o al rival con mas jugadores si no hay dano para comparar.</p>
+se asignan al rival con mas dano contra ese equipo, o al rival con mas jugadores si no hay dano para comparar.
+La fila personal anterior a los colores cuenta solo los killing blows registrados por el jugador, grupo o escuadra detectados; no suma esas estimaciones.</p>
 <p>Destacados permite elegir equipo desde pestanas de color o el menu contextual: solo muestra colores presentes en el combate, incluido el aliado.
 Muestra los jugadores del equipo con dano o corrups registrados, con scroll y sin duplicados; oculta quienes tienen ambos a cero.
 Orden inicial por <strong>dano total + corrups × 2000 + Down contribution</strong>, sin columna de puntuacion visible.

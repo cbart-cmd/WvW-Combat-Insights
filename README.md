@@ -8,7 +8,7 @@ Antes **Fight Analysis Danger**. Se conserva `fight_analysis_danger.dll`, la fir
 el endpoint de actualizacion y la carpeta de ajustes: no hace falta renombrar ni reinstalar nada.
 El historial en memoria se reconstruye desde los logs; no se guarda entre reinicios.
 
-**Version 0.2.32:** las bajas sin killing blow se atribuyen al equipo enemigo que más daño hizo al equipo muerto; si no hay daño identificable, se usa el equipo rival con más jugadores.
+**Version 0.2.33:** Resumen añade una fila personal que muestra kills confirmadas y métricas de tu personaje, grupo o escuadra detectados en el log; no incluye bajas estimadas a nivel de equipo.
 La version 0.2.24 compila la DLL con una sola unidad de codigo para reducir su tamano sin retirar funciones.
 La version 0.2.23 optimiza la descompresion, el analisis de logs y el directo; actualiza la migracion
 de anchos antiguos y elimina el ajuste sin uso de columnas de Resumen.
@@ -37,6 +37,7 @@ si tiene apertura automatica, volvera a abrirse al terminar un combate valido.
 ### Resumen
 
 - Ancho inicial de **259 px** para Resumen, **300 px** para Destacados y **234 px** para Healing; configurable entre **125 y 1000 px**.
+- Antes de las filas por color, la fila **Jugador / Grupo / Escuadra** muestra los datos de tu personaje, subgrupo o escuadra según la pertenencia registrada en el EVTC. Sus kills solo cuentan golpes finales registrados de esos miembros; no incluyen la atribución estimada de equipo.
 - Tres filas y cinco columnas: **jugadores registrados**, **kills causadas contra jugadores**, **dano total registrado**, **corrups totales** y **down c** por equipo.
   Corrups usa el mismo contador de retiradas de boons (strips) que Destacados.
   Down c suma el Down contribution de todos los jugadores del color; la cabecera muestra su nombre completo

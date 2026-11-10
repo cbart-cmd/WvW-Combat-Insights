@@ -1,6 +1,6 @@
 [package]
 name = "fight_analysis_danger"
-version = "0.2.32"
+version = "0.2.33"
 edition = "2024"
 description = "WvW Combat Insights: team summary, player highlights and squad healing for Nexus"
 build = "nexusbase/build.rs"

@@ -1,5 +1,10 @@
 # Progreso: fight_analysis_danger
 
+## v0.2.33: resumen personal por jugador, grupo o escuadra
+- Nueva fila antes de los colores: selecciona automaticamente jugador individual, subgrupo del POV o escuadra segun los miembros y subgrupos registrados en el EVTC.
+- Las kills de esta fila usan solo killing blows directos de esos miembros; las kills estimadas quedan en las filas por color. Dano, strips, down contribution, muertes y derribos se agregan en el mismo alcance.
+- Validacion y publicacion pendientes.
+
 ## v0.2.32: atribuir bajas sin killing blow
 - Las muertes del EVTC que no tienen un `RESULT_KILLING_BLOW` registrado se asignan como kills al equipo rival que mas dano hizo a ese equipo durante el log; sin dano que permita decidir, se asignan al rival con mas jugadores registrados.
 - Las bajas que ya tenian atribucion se conservan; el total es una estimacion a nivel de equipo y no modifica las muertes/derribos reportados.

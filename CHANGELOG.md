@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.33
+
+- Add a personal summary row before the team colors, scoped to the POV player,
+  subgroup or recorded squad. Its kills use only recorded killing blows and exclude
+  team-level estimated kills.
+
 ## 0.2.32
 
 - Attribute deaths without a recorded killing blow to the enemy team that dealt the
