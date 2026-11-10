@@ -108,7 +108,7 @@ pub struct Player {
     pub live_team_id: Option<u16>,
     /// Player who recorded the fight.
     pub is_pov: bool,
-    /// Subgrupo EVTC: 1..=15 pertenece a la escuadra; 0 no pertenece.
+    /// Subgrupo EVTC: 1..=15 pertenece al escuadrón; 0 no pertenece.
     pub subgroup: Option<u8>,
     /// Membership in the POV's recorded squad, not merely the same WvW color.
     pub squad_member: bool,
