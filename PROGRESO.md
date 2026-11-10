@@ -3,7 +3,10 @@
 ## v0.2.32: atribuir bajas sin killing blow
 - Las muertes del EVTC que no tienen un `RESULT_KILLING_BLOW` registrado se asignan como kills al equipo rival que mas dano hizo a ese equipo durante el log; sin dano que permita decidir, se asignan al rival con mas jugadores registrados.
 - Las bajas que ya tenian atribucion se conservan; el total es una estimacion a nivel de equipo y no modifica las muertes/derribos reportados.
-- Validacion pendiente: suite Rust, ejemplo con el EVTC `20261110-230742.zevtc` y build release.
+- En `20261110-230742.zevtc`: Azul pasa de 12 a 15 kills (17 muertes verdes); Verde de 7 a 17 kills (17 muertes azules).
+- Validacion: `cargo fmt --check`, 106 tests Rust y 2 de configuracion; CI de Windows correcto. DLL MZ de 1.127.936 bytes, MD5 `8017a77a2dbe6c38c5cec54e3a03f338`; `GetAddonDef` confirma v0.2.32, firma -1178682436, Direct y URL exacta.
+- Publicado: fuente `f7b8d2f`, distribucion `a0cace4`, release `fight-analysis-danger-v0.2.32` con DLL y MD5, `--latest=false`. Las URL directa, antigua, commit inmutable y asset, mas los dos sidecars, coinciden; latest de Timers no cambia.
+- No se probo con el cliente/parser HTTP de Nexus ni se copio la DLL al juego.
 
 ## v0.2.31: la opacidad atenua las barras de clase
 - El fondo de color de clase se dibujaba con alpha fijo (0.85) y no seguia el ajuste de opacidad, que solo afectaba al fondo negro y al titulo. Ahora su alpha es `0.85 * opacidad`: al 32 % la barra queda al 27 % y al 0 % desaparece.
