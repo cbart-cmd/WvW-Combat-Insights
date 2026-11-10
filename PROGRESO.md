@@ -3,7 +3,10 @@
 ## v0.2.33: resumen personal por jugador, grupo o escuadra
 - Nueva fila antes de los colores: selecciona automaticamente jugador individual, subgrupo del POV o escuadra segun los miembros y subgrupos registrados en el EVTC.
 - Las kills de esta fila usan solo killing blows directos de esos miembros; las kills estimadas quedan en las filas por color. Dano, strips, down contribution, muertes y derribos se agregan en el mismo alcance.
-- Validacion y publicacion pendientes.
+- En el render headless de Resumen, la fila se situa antes de los tres colores y se prueba en los cuatro idiomas. Un test comprueba los alcances jugador/grupo/escuadra y excluye kills estimadas. En el EVTC real, el alcance detectado es Escuadra (13 jugadores): 12 kills confirmadas y 14 muertes; los colores conservan las 15/17 kills estimadas de v0.2.32.
+- Validacion: `cargo fmt --check`, 107 tests Rust y 2 de configuracion; CI de Windows correcto. DLL MZ de 1.147.904 bytes, MD5 `3de5100ede016a598e927dcbea83ee98`; `GetAddonDef` confirma v0.2.33, firma -1178682436, Direct y URL exacta.
+- Publicado: fuente `cc671b9`, distribucion `943666f`, release `fight-analysis-danger-v0.2.33` con DLL y MD5, `--latest=false`. URL directa, antigua, commit inmutable y asset, ademas de los dos sidecars, coinciden; latest de Timers no cambia.
+- No se probo con el cliente HTTP/parser de Nexus ni se copio la DLL al juego.
 
 ## v0.2.32: atribuir bajas sin killing blow
 - Las muertes del EVTC que no tienen un `RESULT_KILLING_BLOW` registrado se asignan como kills al equipo rival que mas dano hizo a ese equipo durante el log; sin dano que permita decidir, se asignan al rival con mas jugadores registrados.
