@@ -1,5 +1,11 @@
 # Progreso: fight_analysis_danger
 
+## v0.2.34: publicar literal corregido para Nexus
+- Se incrementa la version sin cambios funcionales respecto a 0.2.33 para que Nexus detecte la DLL con el literal espanol actualizado a «Escuadron».
+- Validacion: `cargo fmt --check`, 107 tests Rust y 2 de configuracion; CI de Windows correcto. DLL MZ de 1.147.904 bytes, MD5 `510ef9c2619fbfc22db993c482397e2b`; `GetAddonDef` confirma v0.2.34, firma -1178682436, Direct y URL exacta.
+- Publicado: fuente `75537e4`, distribucion `75c3f58`, release `fight-analysis-danger-v0.2.34` con DLL y MD5, `--latest=false`. Tras varios reintentos por cache, la URL exacta de `update_link`, la antigua, el commit inmutable y el asset coinciden; tambien los dos sidecars. Latest de Timers no cambia.
+- No se probo con el cliente HTTP/parser de Nexus ni se copio esta version al juego.
+
 ## v0.2.33: resumen personal por jugador, grupo o escuadra
 - Nueva fila antes de los colores: selecciona automaticamente jugador individual, subgrupo del POV o escuadra segun los miembros y subgrupos registrados en el EVTC.
 - Las kills de esta fila usan solo killing blows directos de esos miembros; las kills estimadas quedan en las filas por color. Dano, strips, down contribution, muertes y derribos se agregan en el mismo alcance.
